@@ -7,10 +7,10 @@ from detectors import CCDetector
 from utils import save_detections_txt
 
 VIDEO_PATH = "data/AICity_data/train/S03/c010/vdo.avi"
-RESULTS_PATH = "results/gaussian_k_9_cc_100"
+RESULTS_PATH = "results/gaussian_k_8_cc_100"
 BG_PERCENTAGE = 0.25
 MIN_CC_PIXELS = 100
-K=9
+K=8
 
 cap = cv.VideoCapture(VIDEO_PATH)
 
@@ -68,6 +68,7 @@ while True:
 cap.release()
 mask_out.release()
 
+print("WARNING: THE FRAME IDs START FROM 0 IN THE DETECTIONS, NOT FROM THE ORIGINAL VIDEO")
 save_detections_txt(detector.detections, os.path.join(RESULTS_PATH, "detections.txt"))
 
 cap = cv.VideoCapture(VIDEO_PATH)
