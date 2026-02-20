@@ -3,3 +3,4 @@ optuna=4.7.0
 pillow=12.1.1
 numpy=2.4.2
 opencv-python=4.13.0.92
+lxml=6.0.2
