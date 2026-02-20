@@ -7,11 +7,11 @@ class GaussianModel():
     a gaussian distribution.
     """
     
-    K = 2.5
+
     
-    
-    def __init__(self, image_size : Tuple[int, int]):
+    def __init__(self, image_size : Tuple[int, int], K : int = 11):
         
+        self.K = K
         self.means = np.zeros(image_size, dtype=float)
         self.stds = np.zeros(image_size, dtype=float)
         self.background_modeled = False
