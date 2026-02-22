@@ -9,11 +9,9 @@ class GaussianModel():
     
 
     
-    def __init__(self, image_size : Tuple[int, int], K : int = 11):
+    def __init__(self, K : int = 11):
         
         self.K = K
-        self.means = np.zeros(image_size, dtype=float)
-        self.stds = np.zeros(image_size, dtype=float)
         self.background_modeled = False
         
     def modelize_back(self, frames):
@@ -22,7 +20,6 @@ class GaussianModel():
         
         self.means = np.mean(frames, axis=0)
         self.stds = np.std(frames, axis=0) + 2
-
         
         self.background_modeled = True
         
