@@ -1,0 +1,4 @@
+Trial 11 finished with value: 25.72236766439121 and parameters: {'k': 6.462684312574635, 'min_cc_pixels': 480, 'open_morph': 5, 'close_morph': 60}. Best is trial 11 with value: 25.72236766439121.
+Best trial: 11. Best value: 25.7224:  17%|██████████████████▊                                                                                           | 12/70 [08:08<39:22, 40.74s/it]Pipeline ended
+
+Best Hyperparameters:  {'k': 6.462684312574635, 'min_cc_pixels': 480, 'open_morph': 5, 'close_morph': 60}

@@ -9,16 +9,21 @@ class GaussianModel():
     
 
     
-    def __init__(self, K : int = 11):
+    def __init__(self, K : int = 11, use_median : bool = False):
         
         self.K = K
         self.background_modeled = False
+        self.use_median = use_median
         
     def modelize_back(self, frames):
         
         frames = frames.astype(np.float32)
         
-        self.means = np.mean(frames, axis=0)
+        if self.use_median:
+            self.means = np.median(frames, axis=0)
+        else:
+            self.means = np.mean(frames, axis=0)
+
         self.stds = np.std(frames, axis=0) + 2
         
         self.background_modeled = True

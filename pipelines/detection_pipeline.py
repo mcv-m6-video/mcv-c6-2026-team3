@@ -8,11 +8,14 @@ import torch
 from detectron2.structures import Boxes, Instances
 from detectron2.evaluation import COCOEvaluator
 from detectron2.data import DatasetCatalog, MetadataCatalog
+import contextlib
 
 class DetectionPipepline():
+    """
+    Complete detection pipeline to avoid repeating code.
+    """
     
     def __init__(self, model, detector, preprocess_fn : Callable[[np.ndarray], np.ndarray] = None):
-        
         self.model = model
         self.detector = detector
         self.preprocess_fn = preprocess_fn
@@ -23,7 +26,9 @@ class DetectionPipepline():
         def get_dataset():
             return gt_data
 
-        DatasetCatalog.register("video_dataset", get_dataset)
+        if "video_dataset" not in DatasetCatalog:
+            DatasetCatalog.register("video_dataset", get_dataset)
+        
         MetadataCatalog.get("video_dataset").set(thing_classes=["object"])
 
         evaluator = COCOEvaluator("video_dataset", output_dir="./results/COCO_output")
@@ -32,9 +37,8 @@ class DetectionPipepline():
         gt_dict = {d["image_id"]: d for d in gt_data}
         
         return evaluator, gt_dict
-    
-        
-    def __call__(self, input : Path, output : Path, annotations : Path, bg_percentage : float):
+     
+    def __call__(self, input : Path, output : Path, annotations : Path, bg_percentage : float, save : bool = True) -> float:
         
         cap = cv.VideoCapture(input)
 
@@ -42,18 +46,20 @@ class DetectionPipepline():
         width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
 
         frame_size = (width, height)
+        
+        if save:
 
-        mask_out = cv.VideoWriter(os.path.join(output, "mask.avi"), 
-                                cv.VideoWriter_fourcc(*'XVID'), 
-                                cap.get(cv.CAP_PROP_FPS), 
-                                frame_size,
-                                isColor=False
-                                )
-        bbox_out = cv.VideoWriter(os.path.join(output, "detections.avi"), 
-                                cv.VideoWriter_fourcc(*'XVID'), 
-                                cap.get(cv.CAP_PROP_FPS), 
-                                frame_size,
-                                isColor=True)
+            mask_out = cv.VideoWriter(os.path.join(output, "mask.avi"), 
+                                    cv.VideoWriter_fourcc(*'XVID'), 
+                                    cap.get(cv.CAP_PROP_FPS), 
+                                    frame_size,
+                                    isColor=False
+                                    )
+            bbox_out = cv.VideoWriter(os.path.join(output, "detections.avi"), 
+                                    cv.VideoWriter_fourcc(*'XVID'), 
+                                    cap.get(cv.CAP_PROP_FPS), 
+                                    frame_size,
+                                    isColor=True)
         
         total_frame_num = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
         bg_frame_num = int(bg_percentage * total_frame_num)
@@ -97,23 +103,42 @@ class DetectionPipepline():
             
             evaluator.process([gt_dict[processed_frames]], [prediction])   
 
-            mask_out.write(detection)
+            if save: 
+                mask_out.write(detection)
             
-            for x1, y1, x2, y2 in bboxes:
-                cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            bbox_out.write(frame)
+                for x1, y1, x2, y2 in bboxes:
+                    cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                bbox_out.write(frame)
             
             processed_frames += 1
 
         cap.release()
-        mask_out.release()
-        bbox_out.release()
-
-        results = evaluator.evaluate()
-
-        with open(f"{output}/metrics.txt", "w") as f:
-            f.write(f"mAP@05 : {results['bbox']['AP50']}")
-            print(f"mAP@05 : {results['bbox']['AP50']}")
+        
+        print("Pipeline ended")
+        
+        if save:
+            mask_out.release()
+            bbox_out.release()
 
 
-        save_detections_txt(self.detector.detections, os.path.join(output, "detections.txt"))
+            with open(f"{output}/metrics.txt", "w") as f, contextlib.redirect_stdout(f):
+                results = evaluator.evaluate()
+
+            with open(f"{output}/metrics.txt", "a") as f:
+                f.write("\n")
+                f.write("--------------------------------------------------------------------------------\n")
+                f.write("\n")
+                f.write(f"mAP@05 : {results['bbox']['AP50']}")
+
+
+            save_detections_txt(self.detector.detections, os.path.join(output, "detections.txt"))
+            
+            print(f"Results can be found inside {output} folder")
+        
+            return results['bbox']['AP50']
+        
+        
+        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+                results = evaluator.evaluate()
+        return results['bbox']['AP50']
+        
