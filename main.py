@@ -7,15 +7,17 @@ import preprocess
 import time
 
 args = set_args()
-K = 4
-MIN_CC_PIXELS = 497
+K = 6
+MIN_CC_PIXELS = 480
 BG_PERCENTAGE = 0.25
 config = build_config(args, f"gaussian_k_{K}_cc_{MIN_CC_PIXELS}")
 
 model = GaussianModel(K, use_median = False)
 detector = CCDetector(min_pixels=MIN_CC_PIXELS)
 
-pipeline = DetectionPipepline(model, detector, preprocess_fn=preprocess.preprocess_morph)
+preprocess_fn = preprocess.generate_morph_func(5, 60)
+
+pipeline = DetectionPipepline(model, detector, preprocess_fn=preprocess_fn)
 
 start = time.time()
 mAP = pipeline(config.input_path, config.output_path, config.xml_path, BG_PERCENTAGE, save=True)
