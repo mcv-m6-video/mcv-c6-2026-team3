@@ -46,7 +46,7 @@ def get_COCO_gt(xml_path : str, image_size : Tuple[int, int], init_frame : int) 
     
     annotations = read_annotations_xml(xml_path)
     
-    height, width = image_size
+    width, height = image_size
     
     gt_data = []
     

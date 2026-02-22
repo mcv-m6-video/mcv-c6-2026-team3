@@ -25,7 +25,10 @@ os.makedirs(RESULTS_PATH, exist_ok=True)
 
 cap = cv.VideoCapture(VIDEO_PATH)
 
-frame_size = (int(cap.get(cv.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv.CAP_PROP_FRAME_HEIGHT)))
+height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+
+frame_size = (width, height)
 
 
 mask_out = cv.VideoWriter(os.path.join(RESULTS_PATH, "mask.avi"), 
@@ -45,12 +48,18 @@ bg_frame_num = int(BG_PERCENTAGE * total_frame_num)
 processed_frames = 0
 bg_frames = []
 
+
 gt_data = get_COCO_gt(XML_PATH, frame_size, bg_frame_num)
 def get_dataset():
     return gt_data
 
 DatasetCatalog.register("video_dataset", get_dataset)
 MetadataCatalog.get("video_dataset").set(thing_classes=["object"])
+
+evaluator = COCOEvaluator("video_dataset", output_dir="./results/COCO_output")
+evaluator.reset()
+
+gt_dict = {d["image_id"]: d for d in gt_data}
 
 model = GaussianModel(image_size=frame_size, K=K)
 detector = CCDetector(min_pixels=MIN_CC_PIXELS)
@@ -77,12 +86,10 @@ while True:
         continue
     
     mask = model(grey_frame).astype(np.uint8) * 255
-
-    frame_id = processed_frames - bg_frame_num
-    
+ 
     bboxes, detection = detector.detect(mask, processed_frames, preprocess=True) 
 
-    instances = Instances(frame_size)
+    instances = Instances((height, width))
     instances.pred_boxes = Boxes(bboxes)
     instances.scores = torch.ones(len(bboxes)) * 0.99
     instances.pred_classes = torch.zeros(len(bboxes))
@@ -90,7 +97,9 @@ while True:
     predictions.append({
         "image_id" : processed_frames,
         "instances" : instances
-    })    
+    })
+    
+    evaluator.process([gt_dict[processed_frames]], [predictions[-1]])   
 
     mask_out.write(detection)
     
@@ -104,12 +113,6 @@ cap.release()
 mask_out.release()
 bbox_out.release()
 
-print(len(gt_data))
-print(len(predictions))
-
-evaluator = COCOEvaluator("video_dataset", output_dir="./results/COCO_output")
-evaluator.reset()
-evaluator.process(gt_data, predictions)
 results = evaluator.evaluate()
 
 with open(f"{RESULTS_PATH}/metrics.txt", "w") as f:
