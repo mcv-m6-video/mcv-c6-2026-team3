@@ -53,11 +53,11 @@ class CCDetector:
             area = stats[i, cv.CC_STAT_AREA]
             
             if area >= self.min_pixels:
-                x = stats[i, cv.CC_STAT_LEFT]
-                y = stats[i, cv.CC_STAT_TOP]
-                w = stats[i, cv.CC_STAT_WIDTH]
-                h = stats[i, cv.CC_STAT_HEIGHT]
-                bboxes.append((x, y, w, h))
+                x1 = stats[i, cv.CC_STAT_LEFT]
+                y1 = stats[i, cv.CC_STAT_TOP]
+                x2 = x1 + stats[i, cv.CC_STAT_WIDTH]
+                y2 = y1 + stats[i, cv.CC_STAT_HEIGHT]
+                bboxes.append((x1, y1, x2, y2))
         
         self.detections[frame_id] = bboxes
         return bboxes, new_mask

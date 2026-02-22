@@ -4,17 +4,17 @@ import os
 import numpy as np
 from models import GaussianModel
 from detectors import CCDetector
-from utils import save_detections_txt
-import argparse
-
-parse = argparse.ArgumentParser()
-parse.add_argument("-d", "--data", help="Data folder containing AICity_data", default="data/", type=str)
-parse.add_argument("-r", "--results", help="Folder to leave the results", default="results", type=str)
-parse.add_argument("-k", "--k", help="Deviation multiplier",default=2.5, type=float)
-parse.add_argument("-m", "--min", help="Minimum ammount of pixels for connected component", default=100, type=int)
-arg = parse.parse_args()
+from utils import *
+import time
+import torch
+from detectron2.structures import Boxes, Instances
+from detectron2.evaluation import COCOEvaluator
+from detectron2.data import DatasetCatalog, MetadataCatalog
 
 
+arg = set_args()
+
+XML_PATH = "data/ai_challenge_s03_c010-full_annotation.xml"
 K = arg.k
 MIN_CC_PIXELS = arg.min
 VIDEO_PATH = f"{arg.data}/AICity_data/train/S03/c010/vdo.avi"
@@ -26,6 +26,7 @@ os.makedirs(RESULTS_PATH, exist_ok=True)
 cap = cv.VideoCapture(VIDEO_PATH)
 
 frame_size = (int(cap.get(cv.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv.CAP_PROP_FRAME_HEIGHT)))
+
 
 mask_out = cv.VideoWriter(os.path.join(RESULTS_PATH, "mask.avi"), 
                           cv.VideoWriter_fourcc(*'XVID'), 
@@ -44,8 +45,18 @@ bg_frame_num = int(BG_PERCENTAGE * total_frame_num)
 processed_frames = 0
 bg_frames = []
 
+gt_data = get_COCO_gt(XML_PATH, frame_size, bg_frame_num)
+def get_dataset():
+    return gt_data
+
+DatasetCatalog.register("video_dataset", get_dataset)
+MetadataCatalog.get("video_dataset").set(thing_classes=["object"])
+
 model = GaussianModel(image_size=frame_size, K=K)
 detector = CCDetector(min_pixels=MIN_CC_PIXELS)
+
+times = {}
+predictions = []
 
 while True:
 
@@ -53,9 +64,10 @@ while True:
     
     if not ret:
         break
-    
-    grey_frame = np.array(cv.cvtColor(frame, cv.COLOR_BGR2GRAY))
-    
+
+
+    grey_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+
     if processed_frames < bg_frame_num:
         processed_frames += 1
         bg_frames.append(grey_frame)
@@ -65,15 +77,25 @@ while True:
         continue
     
     mask = model(grey_frame).astype(np.uint8) * 255
-    
+
     frame_id = processed_frames - bg_frame_num
     
-    bboxes, detection = detector.detect(mask, frame_id, preprocess=True) 
+    bboxes, detection = detector.detect(mask, processed_frames, preprocess=True) 
+
+    instances = Instances(frame_size)
+    instances.pred_boxes = Boxes(bboxes)
+    instances.scores = torch.ones(len(bboxes)) * 0.99
+    instances.pred_classes = torch.zeros(len(bboxes))
     
+    predictions.append({
+        "image_id" : processed_frames,
+        "instances" : instances
+    })    
+
     mask_out.write(detection)
     
-    for x, y, w, h in bboxes:
-        cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    for x1, y1, x2, y2 in bboxes:
+        cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
     bbox_out.write(frame)
     
     processed_frames += 1
@@ -82,5 +104,17 @@ cap.release()
 mask_out.release()
 bbox_out.release()
 
-print("WARNING: THE FRAME IDs START FROM 0 IN THE DETECTIONS, NOT FROM THE ORIGINAL VIDEO")
+print(len(gt_data))
+print(len(predictions))
+
+evaluator = COCOEvaluator("video_dataset", output_dir="./results/COCO_output")
+evaluator.reset()
+evaluator.process(gt_data, predictions)
+results = evaluator.evaluate()
+
+with open(f"{RESULTS_PATH}/metrics.txt", "w") as f:
+    f.write(f"mAP@05 : {results['bbox']['AP50']}")
+    print(f"mAP@05 : {results['bbox']['AP50']}")
+
+
 save_detections_txt(detector.detections, os.path.join(RESULTS_PATH, "detections.txt"))
