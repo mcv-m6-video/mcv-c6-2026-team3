@@ -3,6 +3,8 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.structures import BoxMode
 from typing import Tuple
 import argparse
+import optuna
+
 
 #Read the annotations from Team 1 2018/2019
 def read_annotations_xml(xml_path : str) -> dict:
@@ -100,3 +102,24 @@ def set_args():
     parse.add_argument("-m", "--min", help="Minimum ammount of pixels for connected component", default=100, type=int)
     
     return parse.parse_args()
+
+
+class ConvergenceEarlyStopping:
+    def __init__(self, patience: int = 100, tolerance: float = 1e-3):
+        self.patience = patience
+        self.tolerance = tolerance
+        self.best_score = -float('inf')
+        self.wait = 0
+
+    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial):
+        current_value = study.best_value
+        
+        if current_value > self.best_score + self.tolerance:
+            self.best_score = current_value
+            self.wait = 0
+        else:
+            self.wait += 1
+            
+        if self.wait >= self.patience:
+            print(f"\n[Early Stopping] Convergence reached. No improvement greater than {self.tolerance} for {self.patience} consecutive trials.")
+            study.stop()

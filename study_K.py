@@ -37,5 +37,5 @@ study.optimize(objective, n_trials=70, show_progress_bar=True)
 print("Best Accuracy: ", study.best_value)
 print("Best Hyperparameters: ", study.best_params)
 
-with open('results/best_params.pkl', 'wb') as f:
+with open('results/studies/best_params_K.pkl', 'wb') as f:
     pickle.dump(study.best_params, f)

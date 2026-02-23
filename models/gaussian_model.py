@@ -9,7 +9,7 @@ class GaussianModel():
     
 
     
-    def __init__(self, K : int = 11, use_median : bool = False):
+    def __init__(self, K : int = 6, use_median : bool = False):
         
         self.K = K
         self.background_modeled = False
@@ -29,7 +29,6 @@ class GaussianModel():
         self.background_modeled = True
         
     def __call__(self, frame):
-        
         if not self.background_modeled:
             raise RuntimeError("Background not modeled")
         
