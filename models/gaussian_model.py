@@ -34,7 +34,6 @@ class GaussianModel():
         
         lower_bound = self.means - self.K*self.stds
         upper_bound = self.means + self.K*self.stds
-        
         mask = (frame < lower_bound) | (frame > upper_bound)
         
         return mask 

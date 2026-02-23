@@ -11,8 +11,8 @@ def objective(trial):
     k = trial.suggest_float('k', 1.0, 10.0)
     p = trial.suggest_float('p', 0.01, 0.99) 
     cc_pixels = trial.suggest_int('min_cc_pixels', 100, 500)
-    open_morph = trial.suggest_int("open_morph", 5, 30)
-    close_morph = trial.suggest_int("close_morph", 10, 50)
+    open_morph = trial.suggest_int("open_morph", 5, 20)
+    close_morph = trial.suggest_int("close_morph", 10, 60)
 
     args = set_args()
     BG_PERCENTAGE = 0.25
