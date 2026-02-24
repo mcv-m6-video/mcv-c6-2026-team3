@@ -11,12 +11,13 @@ args = set_args()
 K = 2.67
 MIN_CC_PIXELS = 500
 BG_PERCENTAGE = 0.25
-config = build_config(args, f"lobster_test_4_20_45")
+config = build_config(args, f"lobster_4_20_45")
 
 model = LobsterModel()
 detector = CCDetector(min_pixels=MIN_CC_PIXELS)
 
 preprocess_fn = preprocess.generate_morph_func_adap(4, (20, 45))
+#preprocess_fn = None
 
 pipeline = DetectionPipepline(model, detector, preprocess_fn=preprocess_fn)
 
