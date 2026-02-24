@@ -84,6 +84,7 @@ class DetectionPipepline():
                 bg_frames.append(grey_frame)
                 if processed_frames == bg_frame_num:
                     self.model.modelize_back(np.array(bg_frames))
+                    del bg_frames
                     
                 continue
             

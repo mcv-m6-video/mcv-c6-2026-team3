@@ -22,6 +22,18 @@ class AdaptiveGaussianModel():
         self.stds = np.sqrt(self.variances) + 2
         
         self.background_modeled = True
+       
+    def _shadow_detection(self, img : np.ndarray):
+        
+        img = img.astype(float)
+        
+        dot = img * self.means
+        back_norm = self.means * self.means
+        BD = dot/ (back_norm + 1e-8)
+        V = BD * self.means
+        CD = np.abs(img - BD * self.means)
+        
+        return BD, CD, V
         
     def __call__(self, frame):
         if not self.background_modeled:
@@ -32,6 +44,10 @@ class AdaptiveGaussianModel():
         lower_bound = self.means - self.K * self.stds
         upper_bound = self.means + self.K * self.stds
         mask = (frame < lower_bound) | (frame > upper_bound)
+        
+        BD, CD, V = self._shadow_detection(frame)
+        shadow_mask = (CD < 10) & ( ((1 > BD) & (BD > 0.5)) |  ((1.25 > BD) & (BD > 1)))
+        mask[shadow_mask] = 0
         
         bg_mask = ~mask
         

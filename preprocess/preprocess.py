@@ -1,14 +1,15 @@
 import cv2 as cv
 import numpy as np
+from typing import Tuple
 
-def generate_morph_func(open_size : int, close_size : int):
+def generate_morph_func(open_size : int, close_size : Tuple[int, int]):
     
     def pre_morph(mask : np.ndarray) -> np.ndarray:
         kernel = cv.getStructuringElement(cv.MORPH_RECT, (open_size,open_size))
         mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
         
         #Now we try to connect the resulting components along the image
-        kernel = cv.getStructuringElement(cv.MORPH_RECT, (close_size,close_size))
+        kernel = cv.getStructuringElement(cv.MORPH_RECT, close_size)
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
         
         #We compute boxes of each component and fill them to get rid
