@@ -11,19 +11,21 @@ from config import build_config
 import preprocess
 
 def objective(trial):
-    k = trial.suggest_float('k', 1.0, 10.0)
-    p = trial.suggest_float('p', 0.01, 0.99) 
-    cc_pixels = trial.suggest_int('min_cc_pixels', 100, 500)
-    open_morph = trial.suggest_int("open_morph", 5, 20)
-    close_morph = trial.suggest_int("close_morph", 10, 60)
+    k = trial.suggest_float('k', 1.0, 5.0)
+    p = trial.suggest_float('p', 0.001, 0.01, log=True) 
+    cc_pixels = trial.suggest_int('min_cc_pixels', 350, 700)
+    open_morph = trial.suggest_int("open_morph", 1, 8)
+    close_morph_x = trial.suggest_int("close_morph_x", 5, 40)
+    close_morph_y =  trial.suggest_int("close_morph_y", 5, 60)
 
     args = set_args()
     BG_PERCENTAGE = 0.25
     config = build_config(args, "temp_study", create=False)
+    close_morph = (close_morph_x, close_morph_y)
 
     model = AdaptiveGaussianModel(K=k, p=p)
     detector = CCDetector(min_pixels=cc_pixels)
-    preprocess_fn = preprocess.generate_morph_func(open_morph, close_morph)
+    preprocess_fn = preprocess.generate_morph_func_adap(open_morph, close_morph)
     
     pipeline = DetectionPipepline(model, detector, preprocess_fn=preprocess_fn)
 
@@ -45,7 +47,7 @@ if __name__ == "__main__":
     )
     
     print(f"Initializing optimization for: {study_name}...")
-    study.optimize(objective, n_trials=200, show_progress_bar=True)
+    study.optimize(objective, n_trials=100, show_progress_bar=True)
 
     print(f"Best mAP: {study.best_value}")
     print(f"Best Hyperparameters: {study.best_params}")

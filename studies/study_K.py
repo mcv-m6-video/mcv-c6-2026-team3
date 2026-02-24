@@ -14,9 +14,9 @@ import preprocess
 def objective(trial):
     # Suggest hyperparameters
     k = trial.suggest_float('k', 2.0, 11.0)
-    cc_pixels = trial.suggest_int('min_cc_pixels', 50, 500)
-    open_morph = trial.suggest_int("open_morph", 5, 50)
-    close_morph = trial.suggest_int("close_morph", 10, 60)
+    cc_pixels = trial.suggest_int('min_cc_pixels', 300, 700)
+    open_morph = trial.suggest_int("open_morph", 1, 10)
+    close_morph = trial.suggest_int("close_morph", 30, 80)
 
     args = set_args()
     BG_PERCENTAGE = 0.25
@@ -33,12 +33,20 @@ def objective(trial):
     return mAP
 
 
-study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials=70, show_progress_bar=True)
+os.makedirs('results/studies', exist_ok=True)
+    
+storage_name = "sqlite:///results/studies/optuna_optimization_simple.db"
+study_name = "all_params_study"
 
+study = optuna.create_study(
+    study_name=study_name,
+    storage=storage_name,
+    direction='maximize',
+    load_if_exists=True
+)
 
-print("Best Accuracy: ", study.best_value)
-print("Best Hyperparameters: ", study.best_params)
+print(f"Initializing optimization for: {study_name}...")
+study.optimize(objective, n_trials=100, show_progress_bar=True)
 
-with open('results/studies/best_params_K.pkl', 'wb') as f:
-    pickle.dump(study.best_params, f)
+print(f"Best mAP: {study.best_value}")
+print(f"Best Hyperparameters: {study.best_params}")

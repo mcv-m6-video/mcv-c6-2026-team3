@@ -2,7 +2,7 @@ import cv2 as cv
 import numpy as np
 from typing import Tuple
 
-def generate_morph_func(open_size : int, close_size : Tuple[int, int]):
+def generate_morph_func_adap(open_size : int, close_size : Tuple[int, int]):
     
     def pre_morph(mask : np.ndarray) -> np.ndarray:
         kernel = cv.getStructuringElement(cv.MORPH_RECT, (open_size,open_size))
@@ -10,6 +10,36 @@ def generate_morph_func(open_size : int, close_size : Tuple[int, int]):
         
         #Now we try to connect the resulting components along the image
         kernel = cv.getStructuringElement(cv.MORPH_RECT, close_size)
+        mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+        
+        #We compute boxes of each component and fill them to get rid
+        #of smaller boxes inside good detections
+        # new_mask = np.zeros_like(mask, dtype=np.uint8)
+        
+        # num_labels, labels, stats, centroids = cv.connectedComponentsWithStats(mask, connectivity=8)
+
+        # for i in range(1, num_labels):
+            
+        #     x = stats[i, cv.CC_STAT_LEFT]
+        #     y = stats[i, cv.CC_STAT_TOP]
+        #     w = stats[i, cv.CC_STAT_WIDTH]
+        #     h = stats[i, cv.CC_STAT_HEIGHT]
+            
+        #     new_mask[y:y+h, x:x+w] = 255
+
+
+        return mask
+    
+    return pre_morph
+
+def generate_morph_func(open_size : int, close_size : int):
+    
+    def pre_morph(mask : np.ndarray) -> np.ndarray:
+        kernel = cv.getStructuringElement(cv.MORPH_RECT, (open_size,open_size))
+        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+        
+        #Now we try to connect the resulting components along the image
+        kernel = cv.getStructuringElement(cv.MORPH_RECT, (close_size, close_size))
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
         
         #We compute boxes of each component and fill them to get rid
@@ -28,7 +58,7 @@ def generate_morph_func(open_size : int, close_size : Tuple[int, int]):
             new_mask[y:y+h, x:x+w] = 255
 
 
-        return new_mask
+        return mask
     
     return pre_morph
 

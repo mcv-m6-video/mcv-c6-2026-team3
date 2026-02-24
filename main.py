@@ -8,15 +8,15 @@ import preprocess
 import time
 
 args = set_args()
-K = 4
-MIN_CC_PIXELS = 325
+K = 2.67
+MIN_CC_PIXELS = 500
 BG_PERCENTAGE = 0.25
 config = build_config(args, f"simple_gaussian_test")
 
-model = AdaptiveGaussianModel(K=2.5, p=0.01)
-detector = CCDetector(min_pixels=0)
+model = AdaptiveGaussianModel(K=K, p=0.005)
+detector = CCDetector(min_pixels=MIN_CC_PIXELS)
 
-preprocess_fn = preprocess.generate_morph_func(5, 50)
+preprocess_fn = preprocess.generate_morph_func_adap(4, (20, 45))
 
 pipeline = DetectionPipepline(model, detector, preprocess_fn=preprocess_fn)
 
