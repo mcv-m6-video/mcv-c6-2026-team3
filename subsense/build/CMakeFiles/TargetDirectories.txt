@@ -1,0 +1,3 @@
+/home/adria/Desktop/PC/MCV/C6/mcv-c6-2026-team3/subsense/build/CMakeFiles/Subsense.dir
+/home/adria/Desktop/PC/MCV/C6/mcv-c6-2026-team3/subsense/build/CMakeFiles/edit_cache.dir
+/home/adria/Desktop/PC/MCV/C6/mcv-c6-2026-team3/subsense/build/CMakeFiles/rebuild_cache.dir
