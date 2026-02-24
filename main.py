@@ -11,9 +11,9 @@ args = set_args()
 K = 2.67
 MIN_CC_PIXELS = 500
 BG_PERCENTAGE = 0.25
-config = build_config(args, f"subsense_test")
+config = build_config(args, f"lobster_test_4_20_45")
 
-model = SubsenseModel()
+model = LobsterModel()
 detector = CCDetector(min_pixels=MIN_CC_PIXELS)
 
 preprocess_fn = preprocess.generate_morph_func_adap(4, (20, 45))
