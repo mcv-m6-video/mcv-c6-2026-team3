@@ -1,5 +1,8 @@
 import optuna
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from models.adaptative_gaussian_model import AdaptiveGaussianModel
 from detectors import CCDetector
 from utils import set_args

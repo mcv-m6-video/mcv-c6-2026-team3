@@ -1,12 +1,15 @@
 import optuna
+import os
+import pickle
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from models import GaussianModel
 from detectors import CCDetector
 from utils import *
 from pipelines import DetectionPipepline
 from config import build_config
 import preprocess
-import os
-import pickle
 
 def objective(trial):
     # Suggest hyperparameters
