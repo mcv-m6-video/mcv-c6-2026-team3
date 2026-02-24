@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -DSubsense_EXPORTS
 
-CXX_INCLUDES = -I/home/adria/Desktop/PC/MCV/C6/mcv-c6-2026-team3/subsense
+CXX_INCLUDES = -I/home/adria/Desktop/PC/MCV/C6/mcv-c6-2026-team3/subsense -isystem /usr/include/opencv4
 
-CXX_FLAGS =  -std=c++11 -Ofast -fPIC
+CXX_FLAGS =  -Ofast -std=gnu++11 -fPIC
 

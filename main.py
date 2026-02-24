@@ -1,6 +1,6 @@
 from models import *
 from detectors import *
-from models.adaptative_gaussian_model import AdaptiveGaussianModel
+from models.subsense_lobster_model import SubsenseModel, LobsterModel
 from utils import *
 from pipelines import DetectionPipepline
 from config import build_config
@@ -11,9 +11,9 @@ args = set_args()
 K = 2.67
 MIN_CC_PIXELS = 500
 BG_PERCENTAGE = 0.25
-config = build_config(args, f"simple_gaussian_test")
+config = build_config(args, f"subsense_test")
 
-model = AdaptiveGaussianModel(K=K, p=0.005)
+model = SubsenseModel()
 detector = CCDetector(min_pixels=MIN_CC_PIXELS)
 
 preprocess_fn = preprocess.generate_morph_func_adap(4, (20, 45))
