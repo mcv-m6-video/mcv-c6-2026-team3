@@ -1,2 +1,1 @@
 from .detection_pipeline import DetectionPipepline
-from .dl_detection_pipeline import DLDetectionPipeline

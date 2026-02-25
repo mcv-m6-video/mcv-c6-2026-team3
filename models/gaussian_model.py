@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple
+import cv2 as cv
 
 class GaussianModel():
     """
@@ -78,16 +79,20 @@ class GaussianModelShadow():
         
         return BD, CD, V
         
-    def __call__(self, frame):
+    def __call__(self, frame, mask_bg : cv.VideoWriter = None, mask_shadow : cv.VideoWriter = None):
         if not self.background_modeled:
             raise RuntimeError("Background not modeled")
         
         lower_bound = self.means - self.K*self.stds
         upper_bound = self.means + self.K*self.stds
         mask = (frame < lower_bound) | (frame > upper_bound)
+
+        mask_bg.write(mask.astype(np.uint8) * 255)
         
         BD, CD, V = self._shadow_detection(frame)
         shadow_mask = (CD < 10) & ( ((1 > BD) & (BD > 0.5)) |  ((1.25 > BD) & (BD > 1)))
         mask[shadow_mask] = 0
+
+        mask_shadow.write(mask.astype(np.uint8) * 255)
         
-        return mask 
+        return mask
