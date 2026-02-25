@@ -1,6 +1,7 @@
 import cv2 as cv
 from typing import Tuple, Callable
 import os
+import gc
 from pathlib import Path
 import numpy as np
 from utils import *
@@ -85,6 +86,7 @@ class DetectionPipepline():
                 if processed_frames == bg_frame_num:
                     self.model.modelize_back(np.array(bg_frames))
                     del bg_frames
+                    gc.collect() # Force garbage collection after releasing the heavy background buffer
                     
                 continue
             

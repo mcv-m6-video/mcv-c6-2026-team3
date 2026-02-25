@@ -14,8 +14,9 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    K = 2.633764
-    P = 0.005414
+    #K = 2.633764
+    K = 2.087023 #K of best gaussian simple
+    P = 0.012657 #p of best gaussian simple
     
     MIN_CC_PIXELS = 547
     BG_PERCENTAGE = 0.25
@@ -25,7 +26,7 @@ def main():
     CLOSE_MORPH_Y = 44
     CLOSE_MORPH = (CLOSE_MORPH_X, CLOSE_MORPH_Y)
     
-    config = build_config(args, "adaptive_gaussian_run")
+    config = build_config(args, "adaptive_gaussian_simple_params_run")
 
     model = AdaptiveGaussianModel(K=K, p=P)
     
