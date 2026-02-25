@@ -14,9 +14,8 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    #K = 2.633764
-    K = 2.087023 #K of best gaussian simple
-    P = 0.012657 #p of best gaussian simple
+    K = 2.633764
+    P = 0.012657 #p of best gaussian simple -> CHANGE!!
     
     MIN_CC_PIXELS = 547
     BG_PERCENTAGE = 0.25
