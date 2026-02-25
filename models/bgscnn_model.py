@@ -140,6 +140,9 @@ class BgsCNNV2(nn.Module):
         return torch.sigmoid(x)                 # (B, 1, H, W)
 
 
+TRAINED_DIR = Path(__file__).parent / "trained"
+
+
 class BGsCNNModel:
 
     def __init__(self,
@@ -148,7 +151,8 @@ class BGsCNNModel:
                  batch_size: int = 32,
                  learning_rate: float = 1e-4,
                  image_height: int = 321,
-                 image_width: int = 321):
+                 image_width: int = 321,
+                 checkpoint_name: str = "bgscnn_v2.pt"):
         self.device = device
         self.epochs = epochs
         self.batch_size = batch_size
@@ -157,9 +161,10 @@ class BGsCNNModel:
         self.image_width = image_width
         self.model: BgsCNNV2 | None = None
         self.background_modeled = False
-        self._bg_mean: np.ndarray | None = None   # mean background image (RGB)
+        self._bg_mean: np.ndarray | None = None
+        self.checkpoint_path = TRAINED_DIR / checkpoint_name
         print(f"[BGsCNNModel] device={self.device}, epochs={self.epochs}, lr={self.learning_rate}")
-
+        print(f"[BGsCNNModel] checkpoint={self.checkpoint_path}")
 
     def _prepare_input(self, frame_bgr: np.ndarray, bg_bgr: np.ndarray) -> torch.Tensor:
         frame_rgb = cv.cvtColor(frame_bgr, cv.COLOR_BGR2RGB).astype(np.float32) / 255.0
@@ -173,7 +178,36 @@ class BGsCNNModel:
         return cube.to(self.device)
 
 
+    def _save_checkpoint(self):
+        TRAINED_DIR.mkdir(parents=True, exist_ok=True)
+        torch.save({
+            "model_state": self.model.state_dict(),
+            "bg_mean": self._bg_mean,
+            "image_height": self.image_height,
+            "image_width": self.image_width,
+        }, self.checkpoint_path)
+        print(f"[BGsCNNModel] Checkpoint saved → {self.checkpoint_path}")
+
+    def _load_checkpoint(self) -> bool:
+        if not self.checkpoint_path.exists():
+            return False
+        print(f"[BGsCNNModel] Found checkpoint {self.checkpoint_path}, loading …")
+        ckpt = torch.load(self.checkpoint_path, map_location=self.device)
+        self.image_height = ckpt["image_height"]
+        self.image_width  = ckpt["image_width"]
+        self._bg_mean     = ckpt["bg_mean"]
+        self.model = BgsCNNV2(self.image_height, self.image_width).to(self.device)
+        self.model.load_state_dict(ckpt["model_state"])
+        self.model.eval()
+        self.background_modeled = True
+        print("[BGsCNNModel] Checkpoint loaded, skipping training.\n")
+        return True
+
     def modelize_back(self, frames: np.ndarray, gt_masks: np.ndarray | None = None):
+        # Check for existing checkpoint first
+        if self._load_checkpoint():
+            return
+
         N = len(frames)
         print(f"[BGsCNNModel] Training on {N} frames …")
 
@@ -225,6 +259,7 @@ class BGsCNNModel:
 
         self.model.eval()
         self.background_modeled = True
+        self._save_checkpoint()
         print("[BGsCNNModel] Training complete.\n")
 
     def __call__(self, frame: np.ndarray) -> np.ndarray:
