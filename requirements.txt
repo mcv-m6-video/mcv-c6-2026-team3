@@ -7,3 +7,5 @@ opencv-contrib-python==4.13.0.92
 lxml==6.0.2
 matplotlib==3.10.8
 torchvision==0.25.0
+seaborn
+moviepy

@@ -9,6 +9,7 @@ C6
 ├── pipelines      <--- Complete pipeline for object detection 
 ├── plots          <--- Plotter notebook for slide plots
 ├── preprocess     <--- Preprocess functions for mask refinement
+├── run            <--- Our best templates for running each model
 └── studies        <--- Studies programs for hyperparameter search
 ```
 ## Installation
@@ -33,6 +34,8 @@ The data folder must contain the AICity dataset and the annotations file within 
 To change the model, you just need to open the main.py and change the model used.
 
 If another preprocessing is needed, then change the preprocess_fn function within the main.py file as well.
+
+In the run/ directory, templates of main.py with our best parameters can be found.
 
 The results will be a video with bounding boxes corresponding to the objects and another with the masks that are detected. In addition, a file called metrics.txt would also be found inside the folder, containing the mAP@5 results, as well as other metrics gotten from detectron2.
 
