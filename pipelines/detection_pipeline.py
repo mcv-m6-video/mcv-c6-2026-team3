@@ -107,6 +107,13 @@ class DetectionPipepline():
             if save: 
                 mask_out.write(detection)
             
+                # Draw ground truth boxes in red
+                if processed_frames in gt_dict:
+                    for gt_ann in gt_dict[processed_frames]["annotations"]:
+                        x, y, w, h = gt_ann["bbox"]
+                        cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                
+                # Draw predicted boxes in green
                 for x1, y1, x2, y2 in bboxes:
                     cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 bbox_out.write(frame)
@@ -142,4 +149,3 @@ class DetectionPipepline():
         with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 results = evaluator.evaluate()
         return results['bbox']['AP50']
-        
