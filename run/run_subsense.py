@@ -14,7 +14,7 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    MIN_CC_PIXELS = 300
+    MIN_CC_PIXELS = 500
     BG_PERCENTAGE = 0.25
     
     config = build_config(args, "subsense_run")

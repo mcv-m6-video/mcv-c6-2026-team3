@@ -3,7 +3,7 @@ import sys
 import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import LobsterModel
+from models import GaussianModelShadow
 from detectors import CCDetector
 from utils import set_args
 from pipelines import DetectionPipepline
@@ -14,21 +14,22 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    MIN_CC_PIXELS = 500
+    K = 2.087023
+    MIN_CC_PIXELS = 700
     BG_PERCENTAGE = 0.25
-    OPEN_MORPH = 4
-    CLOSE_MORPH = (20,45)
+    OPEN_MORPH = 5
+    CLOSE_MORPH = 50
     
-    config = build_config(args, "lobster_run")
+    config = build_config(args, "gaussian_shadow_run")
 
-    model = LobsterModel()
+    model = GaussianModelShadow(K=K)
     
     detector = CCDetector(min_pixels=MIN_CC_PIXELS)
-    preprocess_fn = preprocess.generate_morph_func_adap(OPEN_MORPH, CLOSE_MORPH)
+    preprocess_fn = preprocess.generate_morph_func(OPEN_MORPH, CLOSE_MORPH)
     
     pipeline = DetectionPipepline(model, detector, preprocess_fn=preprocess_fn)
     
-    print("Running LOBSTER...")
+    print("Running Gaussian Model (Shadow)...")
     start_time = time.time()
     mAP = pipeline(config.input_path, config.output_path, config.xml_path, BG_PERCENTAGE, save=True)
     end_time = time.time()
