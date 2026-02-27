@@ -80,7 +80,7 @@ class DetectionPipeline():
         
         return evaluator, gt_dict
      
-    def __call__(self, input : Path, output : Path, annotations : Path, save : bool = True) -> Dict[str, float]:
+    def __call__(self, input : Path, output : Path, annotations : Path, train_percentage : float = 0.25, save : bool = True) -> Dict[str, float]:
         cap = cv.VideoCapture(str(input))
 
         height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
@@ -95,20 +95,29 @@ class DetectionPipeline():
                                     isColor=True)
         
         total_frame_num = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+        train_frame_num = int(train_percentage * total_frame_num)
         frame_id = 0
 
-        evaluator, gt_dict = self._create_evaluator(annotations, frame_size, initial_frame=0)
+        evaluator, gt_dict = self._create_evaluator(annotations, frame_size, initial_frame=train_frame_num)
         
         # For mIoU calculation
         all_ious = []
         
-        print(f"Processing {total_frame_num} frames...")
+        print(f"Total frames: {total_frame_num}")
+        print(f"Train frames (skipped): 0-{train_frame_num-1}")
+        print(f"Test frames (evaluated): {train_frame_num}-{total_frame_num-1}")
+        print(f"Processing test frames...")
 
         while True:
             ret, frame = cap.read()
             
             if not ret:
                 break
+            
+            # Skip train frames
+            if frame_id < train_frame_num:
+                frame_id += 1
+                continue
             
             bboxes, scores = self.detector.detect(frame, frame_id)
 

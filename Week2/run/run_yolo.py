@@ -11,7 +11,9 @@ from config import build_config
 def main():
     args = set_args()
     
+    # Configuration parameters
     YOLO_MODEL = "yolo26m.pt"  # Use n for nano, s for small, m for medium, l for large
+    TRAIN_PERCENTAGE = 0.25  # First 25% of frames are train (skipped), rest is test
     
     config = build_config(args, "yolo_run")
 
@@ -21,9 +23,12 @@ def main():
     pipeline = DetectionPipeline(detector)
     
     print("Running YOLO Detection Pipeline...")
+    print(f"Train/Test split: {TRAIN_PERCENTAGE:.0%} train, {1-TRAIN_PERCENTAGE:.0%} test")
+    print("-" * 80)
     
     start_time = time.time()
-    metrics = pipeline(config.input_path, config.output_path, config.xml_path, save=True)
+    metrics = pipeline(config.input_path, config.output_path, config.xml_path, 
+                      train_percentage=TRAIN_PERCENTAGE, save=True)
     end_time = time.time()
 
     print("\n" + "=" * 80)

@@ -9,6 +9,7 @@ Task 1 focuses on **object detection evaluation** using YOLO models on traffic v
 **Detected Classes**: Cars and trucks (COCO classes 2 and 7)  
 **Ground Truth**: Only cars (label="car"), including both parked and non-parked vehicles
 
+A percentage of train frames are set, those are not used for evaluation.
 
 
 
