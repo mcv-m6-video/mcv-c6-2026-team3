@@ -96,7 +96,7 @@ def save_detections_txt(detections, filepath):
 
 def set_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument("-d", "--data", help="Data folder containing AICity_data", default="data/", type=str)
+    parse.add_argument("-d", "--data", help="Data folder containing AICity_data", default="../data/", type=str)
     parse.add_argument("-r", "--results", help="Folder to leave the results", default="results", type=str)
     parse.add_argument("-k", "--k", help="Deviation multiplier",default=2.5, type=float)
     parse.add_argument("-m", "--min", help="Minimum ammount of pixels for connected component", default=100, type=int)

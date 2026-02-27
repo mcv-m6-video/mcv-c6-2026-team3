@@ -2,8 +2,8 @@ import cv2 as cv
 import os
 from utils import read_annotations_xml
 
-VIDEO_PATH = "data/AICity_data/train/S03/c010/vdo.avi"
-XML_PATH = "data/ai_challenge_s03_c010-full_annotation.xml"
+VIDEO_PATH = "../data/AICity_data/train/S03/c010/vdo.avi"
+XML_PATH = "../data/ai_challenge_s03_c010-full_annotation.xml"
 OUTPUT_PATH = "results/gt_video.avi"
 
 gt_annotations = read_annotations_xml(XML_PATH)
