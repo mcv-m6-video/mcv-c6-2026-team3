@@ -2,4 +2,7 @@ data
 .vscode
 Week1/results
 Week1/__pycache__
+Week2/results
+Week2/__pycache__
+Week2/models/*.pt
 ZBS/
