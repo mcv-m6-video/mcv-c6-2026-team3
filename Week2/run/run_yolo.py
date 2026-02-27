@@ -24,22 +24,18 @@ def main():
     
     print("Running YOLO Detection Pipeline...")
     print(f"Train/Test split: {TRAIN_PERCENTAGE:.0%} train, {1-TRAIN_PERCENTAGE:.0%} test")
-    print("-" * 80)
     
     start_time = time.time()
     metrics = pipeline(config.input_path, config.output_path, config.xml_path, 
                       train_percentage=TRAIN_PERCENTAGE, save=True)
     end_time = time.time()
 
-    print("\n" + "=" * 80)
-    print("RESULTS")
-    print("=" * 80)
+    print("\nRESULTS")
     print(f"mAP@0.5  : {metrics['mAP50']:.4f}")
     print(f"mAP@0.75 : {metrics['mAP75']:.4f}")
     print(f"mAP      : {metrics['mAP']:.4f}")
     print(f"mIoU     : {metrics['mIoU']:.4f}")
     print(f"Execution time: {end_time - start_time:.2f} seconds")
-    print("=" * 80)
 
 if __name__ == "__main__":
     main()
