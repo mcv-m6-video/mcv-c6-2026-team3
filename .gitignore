@@ -6,3 +6,4 @@ Week2/results
 Week2/__pycache__
 Week2/models/*.pt
 ZBS/
+__pycache__
