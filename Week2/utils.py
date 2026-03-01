@@ -32,19 +32,15 @@ def read_annotations_xml(xml_path : str) -> dict:
             
         for box in track.findall('box'):
             frame = int(box.get('frame'))
-            xtl = float(box.get('xtl'))
-            ytl = float(box.get('ytl'))
-            xbr = float(box.get('xbr'))
-            ybr = float(box.get('ybr'))
-            
-            x = int(xtl)
-            y = int(ytl)
-            w = int(xbr - xtl)
-            h = int(ybr - ytl)
-            
+            ytl = int(float(box.get('ytl')))
+            xtl = int(float(box.get('xtl')))
+            xbr = int(float(box.get('xbr')))
+            ybr = int(float(box.get('ybr')))
+         
             if frame not in annotations:
-                annotations[frame] = []
-            annotations[frame].append((x, y, w, h))
+                annotations[frame] = [] 
+         
+            annotations[frame].append((xtl, ytl, xbr, ybr))
     
     return annotations
 
@@ -84,10 +80,10 @@ def get_COCO_gt(xml_path : str, image_size : Tuple[int, int], init_frame : int =
         gt_boxes = annotations[frame_id]
         frame_annotations = []
         for box in gt_boxes:
-            x, y, w, h = box
+            x1, y1, x2, y2 = box
             frame_annotations.append({
-                "bbox" : [x, y, w, h],
-                "bbox_mode" : BoxMode.XYWH_ABS,
+                "bbox" : [x1, y1, x2, y2],
+                "bbox_mode" : BoxMode.XYXY_ABS,
                 "category_id" : 0
             })
         

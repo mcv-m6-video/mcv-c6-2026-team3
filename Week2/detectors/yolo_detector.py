@@ -6,22 +6,27 @@ from ultralytics import YOLO
 from pathlib import Path
 
 class YOLODetector:
-    def __init__(self, model_name : str = "yolo26n.pt"):
+    def __init__(self, model_name : str = "yolo26n.pt", model = None, finetune = False):
         # Create models directory if it doesn't exist
-        models_dir = Path(__file__).parent.parent / "models"
-        models_dir.mkdir(exist_ok=True)
-        
-        # Build model path
-        model_path = models_dir / model_name
-        
-        # Load YOLO model (will download to models/ if not exists)
-        self.model = YOLO(str(model_path))
+        if not model:
+            models_dir = Path(__file__).parent.parent / "models"
+            models_dir.mkdir(exist_ok=True)
+            
+            # Build model path
+            model_path = models_dir / model_name
+            
+            # Load YOLO model (will download to models/ if not exists)
+            self.model = YOLO(str(model_path))
+        else:
+            self.model = model
         self.car_class_id = 2  # Car class in COCO dataset
+        self.finetuned = finetune
         self.truck_class_id = 7  # Truck class in COCO dataset
         self.detections = {}  # {frame_id: [(x, y, w, h), ...]}
         self.scores = {}  # {frame_id: [score1, score2, ...]}
     
     def detect(self, frame : np.ndarray, frame_id : int) -> Tuple[list, list]:
+        
         results = self.model(frame, verbose=False)
         
         bboxes = []
@@ -34,7 +39,7 @@ class YOLODetector:
                 class_id = int(boxes.cls[i].item())
                 
                 # Only keep car and truck detections
-                if class_id == self.car_class_id or class_id == self.truck_class_id:
+                if class_id == self.car_class_id or class_id == self.truck_class_id or self.finetuned:
                     x1, y1, x2, y2 = boxes.xyxy[i].cpu().numpy()
                     confidence = boxes.conf[i].item()
                     

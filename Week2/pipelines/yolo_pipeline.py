@@ -5,10 +5,11 @@ from pathlib import Path
 import numpy as np
 from utils import *
 import torch
+from torch.utils.data import DataLoader
 from detectron2.structures import Boxes, Instances
-from detectron2.evaluation import COCOEvaluator
-from detectron2.data import DatasetCatalog, MetadataCatalog
+from datasets import AICityDataset
 import contextlib
+from tqdm import tqdm
 
 
 def compute_iou(box1, box2):
@@ -58,66 +59,68 @@ def compute_mean_iou(pred_boxes: List, gt_boxes: List, iou_threshold: float = 0.
     return sum(ious) / len(ious)
 
 
-class DetectionPipeline():
+class EvaluationPipeline():
+    
     def __init__(self, detector):
         self.detector = detector
-        
-    def _create_evaluator(self, annotations : Path, frame_size : Tuple[int, int], initial_frame : int = 0) -> Tuple[COCOEvaluator, dict]:
-        gt_data = get_COCO_gt(annotations, frame_size, initial_frame)
-        
-        def get_dataset():
-            return gt_data
-
-        if "video_dataset" not in DatasetCatalog:
-            DatasetCatalog.register("video_dataset", get_dataset)
-        
-        MetadataCatalog.get("video_dataset").set(thing_classes=["car"])
-
-        evaluator = COCOEvaluator("video_dataset", output_dir="./results/COCO_output")
-        evaluator.reset()
-
-        gt_dict = {d["image_id"]: d for d in gt_data}
-        
-        return evaluator, gt_dict
      
-    def __call__(self, input : Path, output : Path, annotations : Path, train_percentage : float = 0.25, save : bool = True) -> Dict[str, float]:
-        cap = cv.VideoCapture(str(input))
-
-        height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-        width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    def __call__(
+        self, 
+        dataset : AICityDataset,
+        output : str,
+        subset = None,
+        save : bool = True
+    ) -> Dict[str, float]:
+        
+        if subset:
+            data_loader = DataLoader(
+                dataset=subset,
+                batch_size=1,
+                shuffle=False    
+            )
+        else:
+            data_loader = DataLoader(
+                dataset=dataset,
+                batch_size=1,
+                shuffle=False    
+            )
+        
+        evaluator = dataset.create_evaluator()
+        
+        width = dataset.width
+        height = dataset.height
+        fps = dataset.fps
         frame_size = (width, height)
+        
         
         if save:
             bbox_out = cv.VideoWriter(os.path.join(output, "detections.avi"), 
                                     cv.VideoWriter_fourcc(*'XVID'), 
-                                    cap.get(cv.CAP_PROP_FPS), 
+                                    fps, 
                                     frame_size,
                                     isColor=True)
         
-        total_frame_num = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
-        train_frame_num = int(train_percentage * total_frame_num)
-        frame_id = 0
-
-        evaluator, gt_dict = self._create_evaluator(annotations, frame_size, initial_frame=train_frame_num)
-        
         # For mIoU calculation
         all_ious = []
-        
-        print(f"Total frames: {total_frame_num}")
-        print(f"Train frames (skipped): 0-{train_frame_num-1}")
-        print(f"Test frames (evaluated): {train_frame_num}-{total_frame_num-1}")
-        print(f"Processing test frames...")
 
-        while True:
-            ret, frame = cap.read()
+        for frame_id, (frame, coco_gt) in tqdm(enumerate(data_loader), desc="Processed frames: ", unit=" frames", total=len(data_loader)):
             
-            if not ret:
-                break
+            frame = np.array(frame[0])
             
-            # Skip train frames
-            if frame_id < train_frame_num:
-                frame_id += 1
-                continue
+            fixed_gt = {
+                "file_name": coco_gt["file_name"],
+                "image_id": int(coco_gt["image_id"].item()),
+                "height": int(coco_gt["height"].item()),
+                "width": int(coco_gt["width"].item()),
+                "annotations": [
+                    {
+                        "bbox": [int(x.item()) for x in ann["bbox"]],
+                        "bbox_mode": BoxMode.XYXY_ABS,
+                        "category_id": int(ann["category_id"].item())
+                    }
+                    for ann in coco_gt["annotations"]
+                ]
+            }
             
             bboxes, scores = self.detector.detect(frame, frame_id)
 
@@ -131,19 +134,18 @@ class DetectionPipeline():
                 "instances" : instances
             }
             
-            if frame_id in gt_dict:
-                evaluator.process([gt_dict[frame_id]], [prediction])   
+            evaluator.process([fixed_gt], [prediction])
+            
+            gt_boxes = [ann["bbox"] for ann in fixed_gt["annotations"]]
+            if len(bboxes) > 0 and len(gt_boxes) > 0:
+                frame_iou = compute_mean_iou(bboxes, gt_boxes, iou_threshold=0.5)
+                all_ious.append(frame_iou)  
                 
-                gt_boxes = [ann["bbox"] for ann in gt_dict[frame_id]["annotations"]]
-                if len(bboxes) > 0 and len(gt_boxes) > 0:
-                    frame_iou = compute_mean_iou(bboxes, gt_boxes, iou_threshold=0.5)
-                    all_ious.append(frame_iou)   
-
             if save: 
-                if frame_id in gt_dict:
-                    for gt_ann in gt_dict[frame_id]["annotations"]:
-                        x, y, x2, y2 = gt_ann["bbox"]
-                        cv.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
+                
+                for gt_ann in fixed_gt["annotations"]:
+                    x, y, x2, y2 = gt_ann["bbox"]
+                    cv.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
                 
                 for (x1, y1, x2, y2), score in zip(bboxes, scores):
                     cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -151,16 +153,9 @@ class DetectionPipeline():
                               cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                 
                 bbox_out.write(frame)
-            
-            frame_id += 1
-            
-            if frame_id % 100 == 0:
-                print(f"Processed {frame_id}/{total_frame_num} frames...")
-
-        cap.release()
         
         mean_iou = sum(all_ious) / len(all_ious) if all_ious else 0.0
-        
+                
         print("Pipeline ended")
         
         if save:
