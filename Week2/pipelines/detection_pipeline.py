@@ -97,16 +97,9 @@ class DetectionPipeline():
             bboxes, scores = self.detector.detect(frame, frame_id)
 
             instances = Instances((height, width))
-            # Convert bboxes to proper tensor format (handle empty case)
-            if len(bboxes) > 0:
-                bbox_array = np.array(bboxes, dtype=np.float32)
-                instances.pred_boxes = Boxes(torch.from_numpy(bbox_array))
-                instances.scores = torch.tensor(scores, dtype=torch.float32)
-                instances.pred_classes = torch.zeros(len(bboxes), dtype=torch.int64)
-            else:
-                instances.pred_boxes = Boxes(torch.zeros((0, 4), dtype=torch.float32))
-                instances.scores = torch.zeros(0, dtype=torch.float32)
-                instances.pred_classes = torch.zeros(0, dtype=torch.int64)
+            instances.pred_boxes = Boxes(torch.tensor(bboxes, dtype=torch.float32) if bboxes else torch.zeros((0, 4)))
+            instances.scores = torch.tensor(scores, dtype=torch.float32) if scores else torch.zeros(0)
+            instances.pred_classes = torch.zeros(len(bboxes), dtype=torch.int64) if bboxes else torch.zeros(0, dtype=torch.int64)
             
             prediction = {
                 "image_id" : frame_id,

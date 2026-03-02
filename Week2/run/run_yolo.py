@@ -13,7 +13,7 @@ def main():
     
     # Configuration parameters
     YOLO_MODEL = "yolo26m.pt"
-    TRAIN_PERCENTAGE = 0.25
+    TRAIN_PERCENTAGE = 0
     
     config = build_config(args, "yolo_26_run")
 
