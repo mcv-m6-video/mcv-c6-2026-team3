@@ -204,6 +204,14 @@ class TrackingPipeline:
                     cv.putText(frame, f"ID: {track_id}", (x, y - 5),
                               cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                 
+                # Add frame counter at bottom right
+                frame_text = f"Frame {frame_id}"
+                text_size = cv.getTextSize(frame_text, cv.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+                text_x = width - text_size[0] - 10
+                text_y = height - 10
+                cv.putText(frame, frame_text, (text_x, text_y), 
+                          cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                
                 track_out.write(frame)
             
             frame_id += 1

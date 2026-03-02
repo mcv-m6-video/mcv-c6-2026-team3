@@ -14,19 +14,17 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    IOU_THRESHOLD = 0.4
+    IOU_THRESHOLD = 0.2
     TRAIN_PERCENTAGE = 0
     DETECTIONS_FILE = Path(f"{args.results}/yolo_run/detections.txt")
     
-    config = build_config(args, "tracking_from_detections")
+    config = build_config(args, "tracking_from_detections_0.2")
     
     print(f"Initializing IOU Tracker (threshold={IOU_THRESHOLD})")
     tracker = IOUTracker(iou_threshold=IOU_THRESHOLD)
     
     pipeline = TrackingPipeline(tracker, detector=None)
     
-    print("Running Tracking Pipeline from Pre-computed Detections...")
-    print(f"Detections file: {DETECTIONS_FILE}")
     print(f"Train/Test split: {TRAIN_PERCENTAGE:.0%} train, {1-TRAIN_PERCENTAGE:.0%} test")
     
     start_time = time.time()
