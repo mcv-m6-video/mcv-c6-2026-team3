@@ -12,13 +12,12 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    YOLO_MODEL = "yolo26m.pt"
+    YOLO_MODEL = "yolo_finetuned.pt"
     TRAIN_PERCENTAGE = 0
     
-    config = build_config(args, "yolo_26_run")
+    config = build_config(args, "yolo_finetuned_run")
 
-    print(f"Loading YOLO model: {YOLO_MODEL}")
-    detector = YOLODetector(model_name=YOLO_MODEL)
+    detector = YOLODetector(model_name=YOLO_MODEL, finetune=True)
     
     pipeline = DetectionPipeline(detector)
     

@@ -15,10 +15,10 @@ def main():
     
     # Configuration parameters
     IOU_THRESHOLD = 0.2
-    TRAIN_PERCENTAGE = 0
-    DETECTIONS_FILE = Path(f"{args.results}/yolo_run/detections.txt")
+    TRAIN_PERCENTAGE = 0.25
+    DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
     
-    config = build_config(args, "tracking_from_detections_0.2")
+    config = build_config(args, "tracking_from_detections_0.2_finetuned")
     
     print(f"Initializing IOU Tracker (threshold={IOU_THRESHOLD})")
     tracker = IOUTracker(iou_threshold=IOU_THRESHOLD)

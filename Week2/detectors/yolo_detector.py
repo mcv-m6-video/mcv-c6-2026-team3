@@ -27,7 +27,7 @@ class YOLODetector:
     
     def detect(self, frame : np.ndarray, frame_id : int) -> Tuple[list, list]:
         
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, verbose=False, end2end=False)
         
         bboxes = []
         scores = []
