@@ -12,10 +12,10 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    YOLO_MODEL = "yolo26m.pt"  # Use n for nano, s for small, m for medium, l for large
-    TRAIN_PERCENTAGE = 0.25  # First 25% of frames are train (skipped), rest is test
+    YOLO_MODEL = "yolo26m.pt"
+    TRAIN_PERCENTAGE = 0.25
     
-    config = build_config(args, "yolo_run")
+    config = build_config(args, "yolo_26_run")
 
     print(f"Loading YOLO model: {YOLO_MODEL}")
     detector = YOLODetector(model_name=YOLO_MODEL)
