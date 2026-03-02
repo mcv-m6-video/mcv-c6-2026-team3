@@ -11,30 +11,6 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 import contextlib
 
 
-def compute_iou(box1, box2):
-    x1_1, y1_1, x2_1, y2_1 = box1
-    x1_2, y1_2, x2_2, y2_2 = box2
-    
-    x1_i = max(x1_1, x1_2)
-    y1_i = max(y1_1, y1_2)
-    x2_i = min(x2_1, x2_2)
-    y2_i = min(y2_1, y2_2)
-    
-    if x2_i < x1_i or y2_i < y1_i:
-        return 0.0
-    
-    intersection = (x2_i - x1_i) * (y2_i - y1_i)
-    
-    area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
-    area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
-    union = area1 + area2 - intersection
-    
-    if union == 0:
-        return 0.0
-    
-    return intersection / union
-
-
 def compute_mean_iou(pred_boxes: List, gt_boxes: List, iou_threshold: float = 0.5) -> float:
     if len(pred_boxes) == 0 or len(gt_boxes) == 0:
         return 0.0
