@@ -155,6 +155,7 @@ class DetectionPipeline():
                 f.write(f"mIoU     : {mean_iou:.4f}\n")
 
             save_detections_txt(self.detector.detections, os.path.join(output, "detections.txt"))
+            save_all_detections_txt(self.detector.all_detections_with_scores, os.path.join(output, "all_detections.txt"))
             
             print(f"Results can be found inside {output} folder")
         

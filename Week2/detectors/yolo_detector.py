@@ -24,6 +24,7 @@ class YOLODetector:
         self.truck_class_id = 7  # Truck class in COCO dataset
         self.detections = {}  # {frame_id: [(x, y, w, h), ...]}
         self.scores = {}  # {frame_id: [score1, score2, ...]}
+        self.all_detections_with_scores = {}  # {frame_id: [(x, y, w, h, conf), ...]}
     
     def detect(self, frame : np.ndarray, frame_id : int) -> Tuple[list, list]:
         
@@ -54,5 +55,9 @@ class YOLODetector:
         
         self.detections[frame_id] = detections_xywh
         self.scores[frame_id] = scores
+        
+        # Store all detections with scores for future tracking
+        detections_with_scores = [(x, y, w, h, conf) for (x, y, w, h), conf in zip(detections_xywh, scores)]
+        self.all_detections_with_scores[frame_id] = detections_with_scores
         
         return bboxes, scores

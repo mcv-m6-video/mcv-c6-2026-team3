@@ -146,6 +146,20 @@ def save_detections_txt(detections, filepath):
                 f.write(f"{frame_id},{x},{y},{w},{h}\n")
 
 
+def save_all_detections_txt(detections_with_scores, filepath):
+    """
+    Save all detections with confidence scores to a text file.
+    
+    Args:
+        detections_with_scores: Dictionary mapping frame_id to list of (x, y, w, h, confidence) tuples
+        filepath: Output file path
+    """
+    with open(filepath, 'w') as f:
+        for frame_id in sorted(detections_with_scores.keys()):
+            for x, y, w, h, conf in detections_with_scores[frame_id]:
+                f.write(f"{frame_id},{x},{y},{w},{h},{conf}\n")
+
+
 def load_detections_txt(filepath):
     """
     Load detections from a text file.
