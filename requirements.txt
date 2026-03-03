@@ -13,4 +13,5 @@ ultralytics
 scipy
 filterpy
 tqdm
+supervision
 torchmetrics
