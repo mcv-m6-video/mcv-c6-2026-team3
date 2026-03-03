@@ -82,7 +82,7 @@ def evaluate_tracking(pred_tracks: Dict, gt_tracks: Dict) -> Dict[str, float]:
         # Predictions
         pred_dets = pred_tracks.get(frame_id, [])
         pred_ids = np.array([pred_id_map[tid] for tid, _ in pred_dets], dtype=int)
-        pred_bboxes = np.array([[x, y, x+w, y+h] for _, (x, y, w, h) in pred_dets], dtype=float)
+        pred_bboxes = np.array([[bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]] for _, bbox in pred_dets], dtype=float)
         if len(pred_ids) == 0:
             pred_bboxes = np.zeros((0, 4), dtype=float)
         
@@ -194,7 +194,7 @@ class TrackingPipeline:
             if save:
                 # Draw tracking results
                 for track_id, bbox in tracked_objects:
-                    x, y, w, h = bbox
+                    x, y, w, h = bbox[:4]  # Ignore confidence score if present
                     x2, y2 = x + w, y + h
                     
                     # Different colors for different track IDs
@@ -267,13 +267,13 @@ class TrackingPipeline:
             
             bboxes, scores = self.detector.detect(frame, frame_id)
             
-            # Convert XYXY to XYWH
+            # Convert XYXY to XYWH and include scores
             frame_detections = []
-            for bbox in bboxes:
+            for bbox, score in zip(bboxes, scores):
                 x1, y1, x2, y2 = bbox
                 w = x2 - x1
                 h = y2 - y1
-                frame_detections.append((x1, y1, w, h))
+                frame_detections.append((x1, y1, w, h, score))
             
             detections[frame_id] = frame_detections
             frame_id += 1

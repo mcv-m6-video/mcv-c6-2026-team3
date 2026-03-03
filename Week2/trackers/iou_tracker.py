@@ -12,7 +12,8 @@ class IOUTracker:
         self.active_tracks = {}  # {track_id: bbox_xyxy}
         
     def xywh_to_xyxy(self, bbox):
-        x, y, w, h = bbox
+        # Handle both 4-element (x,y,w,h) and 5-element (x,y,w,h,conf) tuples
+        x, y, w, h = bbox[:4]
         return (x, y, x + w, y + h)
     
     def xyxy_to_xywh(self, bbox):

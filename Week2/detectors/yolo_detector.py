@@ -22,9 +22,8 @@ class YOLODetector:
         self.car_class_id = 2  # Car class in COCO dataset
         self.finetuned = finetune
         self.truck_class_id = 7  # Truck class in COCO dataset
-        self.detections = {}  # {frame_id: [(x, y, w, h), ...]}
-        self.scores = {}  # {frame_id: [score1, score2, ...]}
-        self.all_detections_with_scores = {}  # {frame_id: [(x, y, w, h, conf), ...]}
+        self.detections = {}  # {frame_id: [(x, y, w, h, conf), ...]}
+        self.scores = {}  # {frame_id: [score1, score2, ...]} - kept for backward compatibility
     
     def detect(self, frame : np.ndarray, frame_id : int) -> Tuple[list, list]:
         
@@ -53,11 +52,9 @@ class YOLODetector:
                     h = y2 - y1
                     detections_xywh.append((x1, y1, w, h))
         
-        self.detections[frame_id] = detections_xywh
-        self.scores[frame_id] = scores
-        
-        # Store all detections with scores for future tracking
+        # Store detections with scores (new format)
         detections_with_scores = [(x, y, w, h, conf) for (x, y, w, h), conf in zip(detections_xywh, scores)]
-        self.all_detections_with_scores[frame_id] = detections_with_scores
+        self.detections[frame_id] = detections_with_scores
+        self.scores[frame_id] = scores  # Keep for backward compatibility
         
         return bboxes, scores

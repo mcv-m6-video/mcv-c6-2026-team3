@@ -10,3 +10,5 @@ torchvision==0.25.0
 seaborn
 moviepy
 ultralytics
+scipy
+filterpy

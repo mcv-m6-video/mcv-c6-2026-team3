@@ -134,29 +134,15 @@ def compute_iou(box1, box2):
 
 def save_detections_txt(detections, filepath):
     """
-    Save detections to a text file.
+    Save detections to a text file with confidence scores.
     
     Args:
-        detections: Dictionary mapping frame_id to list of bounding boxes
+        detections: Dictionary mapping frame_id to list of (x, y, w, h, confidence) tuples
         filepath: Output file path
     """
     with open(filepath, 'w') as f:
         for frame_id in sorted(detections.keys()):
-            for x, y, w, h in detections[frame_id]:
-                f.write(f"{frame_id},{x},{y},{w},{h}\n")
-
-
-def save_all_detections_txt(detections_with_scores, filepath):
-    """
-    Save all detections with confidence scores to a text file.
-    
-    Args:
-        detections_with_scores: Dictionary mapping frame_id to list of (x, y, w, h, confidence) tuples
-        filepath: Output file path
-    """
-    with open(filepath, 'w') as f:
-        for frame_id in sorted(detections_with_scores.keys()):
-            for x, y, w, h, conf in detections_with_scores[frame_id]:
+            for x, y, w, h, conf in detections[frame_id]:
                 f.write(f"{frame_id},{x},{y},{w},{h},{conf}\n")
 
 
@@ -165,10 +151,10 @@ def load_detections_txt(filepath):
     Load detections from a text file.
     
     Args:
-        filepath: Input file path with format: frame_id,x,y,w,h
+        filepath: Input file path with format: frame_id,x,y,w,h,confidence
         
     Returns:
-        Dictionary mapping frame_id to list of bounding boxes in XYWH format
+        Dictionary mapping frame_id to list of (x, y, w, h, confidence) tuples
     """
     detections = {}
     with open(filepath, 'r') as f:
@@ -176,11 +162,12 @@ def load_detections_txt(filepath):
             parts = line.strip().split(',')
             frame_id = int(parts[0])
             x, y, w, h = int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4])
+            conf = float(parts[5]) if len(parts) >= 6 else 1.0  # Default confidence if not present
             
             if frame_id not in detections:
                 detections[frame_id] = []
             
-            detections[frame_id].append((x, y, w, h))
+            detections[frame_id].append((x, y, w, h, conf))
     
     return detections
 
@@ -196,7 +183,7 @@ def save_tracking_txt(tracks, filepath):
     with open(filepath, 'w') as f:
         for frame_id in sorted(tracks.keys()):
             for track_id, bbox in tracks[frame_id]:
-                x, y, w, h = bbox
+                x, y, w, h = bbox[:4]  # Ignore confidence score if present
                 # MOTChallenge format: frame, id, x, y, w, h, conf, -1, -1, -1
                 f.write(f"{frame_id},{track_id},{x},{y},{w},{h},1,-1,-1,-1\n")
 

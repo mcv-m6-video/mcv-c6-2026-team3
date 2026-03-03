@@ -1,5 +1,0 @@
-
-1. DUPLICATED BBOXS:
-
-YOLO generates redundant BBoxes, that means two bboxes with almost the same selection (and for the same object); 
-this produces errors in tracking when the second bbox appears, is identified wi
