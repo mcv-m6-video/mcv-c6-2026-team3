@@ -86,7 +86,7 @@ class EvaluationPipeline():
                 shuffle=False    
             )
         
-        
+        evaluator = dataset.create_evaluator()
         
         width = dataset.width
         height = dataset.height

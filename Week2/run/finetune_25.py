@@ -66,7 +66,7 @@ pipeline = NoDetectronPipeline(detector)
 
 start_time = time.time()
 
-pipeline(
+metrics = pipeline(
     dataset, 
     output=config.output_path,
     subset=val_dataset,
@@ -75,9 +75,9 @@ pipeline(
 
 end_time = time.time()
 
-# print("\nRESULTS")
-# print(f"mAP@0.5  : {metrics['mAP50']:.4f}")
-# print(f"mAP@0.75 : {metrics['mAP75']:.4f}")
-# print(f"mAP      : {metrics['mAP']:.4f}")
-# print(f"mIoU     : {metrics['mIoU']:.4f}")
-# print(f"Execution time: {end_time - start_time:.2f} seconds")
+print("\nRESULTS")
+print(f"mAP@0.5  : {metrics['map_50']:.4f}")
+print(f"mAP@0.75 : {metrics['map_75']:.4f}")
+print(f"mAP      : {metrics['map']:.4f}")
+print(f"mIoU     : {metrics['miou']:.4f}")
+print(f"Execution time: {end_time - start_time:.2f} seconds")
