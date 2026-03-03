@@ -6,6 +6,7 @@ import numpy as np
 from utils import *
 import contextlib
 import trackeval
+from tqdm import tqdm
 
 #Numpy retrocompatibility for older versions of trackeval
 if not hasattr(np, 'float'):
@@ -172,52 +173,51 @@ class TrackingPipeline:
                                       isColor=True)
         
         print(f"Test frames (tracked): {train_frame_num}-{total_frame_num-1}")
-        print(f"Running tracking...")
         
         frame_id = 0
         
-        while True:
-            ret, frame = cap.read()
-            
-            if not ret:
-                break
-            
-            # Skip train frames
-            if frame_id < train_frame_num:
+        with tqdm(total=total_frame_num, desc="Tracking frames", unit="frame") as pbar:
+            while True:
+                ret, frame = cap.read()
+                
+                if not ret:
+                    break
+                
+                # Skip train frames
+                if frame_id < train_frame_num:
+                    frame_id += 1
+                    pbar.update(1)
+                    continue
+                
+                # Get detections and track
+                frame_detections = detections.get(frame_id, [])
+                tracked_objects = self.tracker.track(frame_detections, frame_id)
+                
+                if save:
+                    # Draw tracking results
+                    for track_id, bbox in tracked_objects:
+                        x, y, w, h = bbox[:4]  # Ignore confidence score if present
+                        x2, y2 = x + w, y + h
+                        
+                        # Different colors for different track IDs
+                        color = tuple([int(c) for c in np.random.RandomState(track_id).randint(0, 255, 3)])
+                        
+                        cv.rectangle(frame, (x, y), (x2, y2), color, 2)
+                        cv.putText(frame, f"ID: {track_id}", (x, y - 5),
+                                  cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                    
+                    # Add frame counter at bottom right
+                    frame_text = f"Frame {frame_id}"
+                    text_size = cv.getTextSize(frame_text, cv.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+                    text_x = width - text_size[0] - 10
+                    text_y = height - 10
+                    cv.putText(frame, frame_text, (text_x, text_y), 
+                              cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    
+                    track_out.write(frame)
+                
                 frame_id += 1
-                continue
-            
-            # Get detections and track
-            frame_detections = detections.get(frame_id, [])
-            tracked_objects = self.tracker.track(frame_detections, frame_id)
-            
-            if save:
-                # Draw tracking results
-                for track_id, bbox in tracked_objects:
-                    x, y, w, h = bbox[:4]  # Ignore confidence score if present
-                    x2, y2 = x + w, y + h
-                    
-                    # Different colors for different track IDs
-                    color = tuple([int(c) for c in np.random.RandomState(track_id).randint(0, 255, 3)])
-                    
-                    cv.rectangle(frame, (x, y), (x2, y2), color, 2)
-                    cv.putText(frame, f"ID: {track_id}", (x, y - 5),
-                              cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                
-                # Add frame counter at bottom right
-                frame_text = f"Frame {frame_id}"
-                text_size = cv.getTextSize(frame_text, cv.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-                text_x = width - text_size[0] - 10
-                text_y = height - 10
-                cv.putText(frame, frame_text, (text_x, text_y), 
-                          cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                
-                track_out.write(frame)
-            
-            frame_id += 1
-            
-            if frame_id % 100 == 0:
-                print(f"Tracked {frame_id}/{total_frame_num} frames...")
+                pbar.update(1)
         
         cap.release()
         if save:
@@ -256,30 +256,30 @@ class TrackingPipeline:
         detections = {}
         frame_id = 0
         
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            if frame_id < train_frames:
+        with tqdm(total=total_frames, desc="Detecting frames", unit="frame") as pbar:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                if frame_id < train_frames:
+                    frame_id += 1
+                    pbar.update(1)
+                    continue
+                
+                bboxes, scores = self.detector.detect(frame, frame_id)
+                
+                # Convert XYXY to XYWH and include scores
+                frame_detections = []
+                for bbox, score in zip(bboxes, scores):
+                    x1, y1, x2, y2 = bbox
+                    w = x2 - x1
+                    h = y2 - y1
+                    frame_detections.append((x1, y1, w, h, score))
+                
+                detections[frame_id] = frame_detections
                 frame_id += 1
-                continue
-            
-            bboxes, scores = self.detector.detect(frame, frame_id)
-            
-            # Convert XYXY to XYWH and include scores
-            frame_detections = []
-            for bbox, score in zip(bboxes, scores):
-                x1, y1, x2, y2 = bbox
-                w = x2 - x1
-                h = y2 - y1
-                frame_detections.append((x1, y1, w, h, score))
-            
-            detections[frame_id] = frame_detections
-            frame_id += 1
-            
-            if frame_id % 100 == 0:
-                print(f"Detected {frame_id}/{total_frames} frames...")
+                pbar.update(1)
         
         cap.release()
         return detections

@@ -12,3 +12,4 @@ moviepy
 ultralytics
 scipy
 filterpy
+tqdm

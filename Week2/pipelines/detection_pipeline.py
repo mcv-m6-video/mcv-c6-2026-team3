@@ -9,6 +9,7 @@ from detectron2.structures import Boxes, Instances
 from detectron2.evaluation import COCOEvaluator
 from detectron2.data import DatasetCatalog, MetadataCatalog
 import contextlib
+from tqdm import tqdm
 
 
 def compute_mean_iou(pred_boxes: List, gt_boxes: List, iou_threshold: float = 0.5) -> float:
@@ -81,56 +82,55 @@ class DetectionPipeline():
         print(f"Total frames: {total_frame_num}")
         print(f"Train frames (skipped): 0-{train_frame_num-1}")
         print(f"Test frames (evaluated): {train_frame_num}-{total_frame_num-1}")
-        print(f"Processing test frames...")
 
-        while True:
-            ret, frame = cap.read()
-            
-            if not ret:
-                break
-            
-            # Skip train frames
-            if frame_id < train_frame_num:
-                frame_id += 1
-                continue
-            
-            bboxes, scores = self.detector.detect(frame, frame_id)
-
-            instances = Instances((height, width))
-            instances.pred_boxes = Boxes(torch.tensor(bboxes, dtype=torch.float32) if bboxes else torch.zeros((0, 4)))
-            instances.scores = torch.tensor(scores, dtype=torch.float32) if scores else torch.zeros(0)
-            instances.pred_classes = torch.zeros(len(bboxes), dtype=torch.int64) if bboxes else torch.zeros(0, dtype=torch.int64)
-            
-            prediction = {
-                "image_id" : frame_id,
-                "instances" : instances
-            }
-            
-            if frame_id in gt_dict:
-                evaluator.process([gt_dict[frame_id]], [prediction])   
+        with tqdm(total=total_frame_num, desc="Processing frames", unit="frame") as pbar:
+            while True:
+                ret, frame = cap.read()
                 
-                gt_boxes = [ann["bbox"] for ann in gt_dict[frame_id]["annotations"]]
-                if len(bboxes) > 0 and len(gt_boxes) > 0:
-                    frame_iou = compute_mean_iou(bboxes, gt_boxes, iou_threshold=0.5)
-                    all_ious.append(frame_iou)   
+                if not ret:
+                    break
+                
+                # Skip train frames
+                if frame_id < train_frame_num:
+                    frame_id += 1
+                    pbar.update(1)
+                    continue
+                
+                bboxes, scores = self.detector.detect(frame, frame_id)
 
-            if save: 
+                instances = Instances((height, width))
+                instances.pred_boxes = Boxes(torch.tensor(bboxes, dtype=torch.float32) if bboxes else torch.zeros((0, 4)))
+                instances.scores = torch.tensor(scores, dtype=torch.float32) if scores else torch.zeros(0)
+                instances.pred_classes = torch.zeros(len(bboxes), dtype=torch.int64) if bboxes else torch.zeros(0, dtype=torch.int64)
+                
+                prediction = {
+                    "image_id" : frame_id,
+                    "instances" : instances
+                }
+                
                 if frame_id in gt_dict:
-                    for gt_ann in gt_dict[frame_id]["annotations"]:
-                        x, y, x2, y2 = gt_ann["bbox"]
-                        cv.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
+                    evaluator.process([gt_dict[frame_id]], [prediction])   
+                    
+                    gt_boxes = [ann["bbox"] for ann in gt_dict[frame_id]["annotations"]]
+                    if len(bboxes) > 0 and len(gt_boxes) > 0:
+                        frame_iou = compute_mean_iou(bboxes, gt_boxes, iou_threshold=0.5)
+                        all_ious.append(frame_iou)   
+
+                if save: 
+                    if frame_id in gt_dict:
+                        for gt_ann in gt_dict[frame_id]["annotations"]:
+                            x, y, x2, y2 = gt_ann["bbox"]
+                            cv.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
+                    
+                    for (x1, y1, x2, y2), score in zip(bboxes, scores):
+                        cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv.putText(frame, f"{score:.2f}", (x1, y1 - 5), 
+                                  cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    
+                    bbox_out.write(frame)
                 
-                for (x1, y1, x2, y2), score in zip(bboxes, scores):
-                    cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv.putText(frame, f"{score:.2f}", (x1, y1 - 5), 
-                              cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                
-                bbox_out.write(frame)
-            
-            frame_id += 1
-            
-            if frame_id % 100 == 0:
-                print(f"Processed {frame_id}/{total_frame_num} frames...")
+                frame_id += 1
+                pbar.update(1)
 
         cap.release()
         
