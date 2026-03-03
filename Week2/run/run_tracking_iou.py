@@ -14,9 +14,9 @@ def main():
     args = set_args()
     
     # Configuration parameters
-    IOU_THRESHOLD = 0.2
+    IOU_THRESHOLD = 0.1869655175330422 #Best parameter found with optuna
     TRAIN_PERCENTAGE = 0.25
-    DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
+    DETECTIONS_FILE = Path(f"{args.results}/detections.txt")
     
     config = build_config(args, "tracking_from_detections_0.2_finetuned")
     

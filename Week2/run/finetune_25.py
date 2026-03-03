@@ -52,15 +52,15 @@ yaml_content = {
 with open(f'{config.yolo_path}/dataset.yaml', 'w') as f:
     yaml.dump(yaml_content, f)
 
-# models_dir = Path("./models")
-# model_path = models_dir / YOLO_MODEL
+models_dir = Path("./models")
+model_path = models_dir / YOLO_MODEL
 
-# model = YOLO(str(model_path))
-# model.train(data=f'{config.yolo_path}/dataset.yaml', epochs=20, imgsz=640, batch=16, project="models", name="Finetune0.25", freeze=21)
+model = YOLO(str(model_path))
+model.train(data=f'{config.yolo_path}/dataset.yaml', epochs=20, imgsz=640, batch=16, project="models", name="Finetune0.25", freeze=11)
 
 val_dataset = Subset(dataset, val_idx)
 
-detector = YOLODetector(model_name=YOLO_MODEL, finetune=True)
+detector = YOLODetector(model_name=YOLO_MODEL, finetune=True, model=model)
 
 pipeline = NoDetectronPipeline(detector)
 
