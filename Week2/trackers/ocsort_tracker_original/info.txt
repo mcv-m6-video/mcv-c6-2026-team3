@@ -1,0 +1,2 @@
+This folder forms part of the official implementation of OC-SORT and was extracted from: 
+https://github.com/noahcao/OC_SORT/tree/master/trackers/ocsort_tracker
