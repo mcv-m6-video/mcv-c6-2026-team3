@@ -1,1 +1,1 @@
-from .AI_city_dataset import AICityDataset
+from .AI_city_dataset import AICityDataset, collate_fn

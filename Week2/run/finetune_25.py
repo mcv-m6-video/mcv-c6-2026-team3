@@ -1,6 +1,6 @@
 from sklearn.model_selection import KFold
 from detectors import YOLODetector
-from pipelines import EvaluationPipeline
+from pipelines import EvaluationPipeline, NoDetectronPipeline
 from torch.utils.data import Subset
 from datasets import AICityDataset
 from config import *
@@ -14,11 +14,11 @@ import time
 args = set_args()
     
 # Configuration parameters
-YOLO_MODEL = "yolo26n.pt"  # Use n for nano, s for small, m for medium, l for large
+YOLO_MODEL = "best.pt"  # Use n for nano, s for small, m for medium, l for large
 TRAIN_PERCENTAGE = 0.25
 FOLDS = 4
 
-config = build_config(args, "yolo_finetune_25")
+config = build_config(args, "yolo_finetune_25_prob")
 
 dataset = AICityDataset(
     config.input_path, 
@@ -52,25 +52,32 @@ yaml_content = {
 with open(f'{config.yolo_path}/dataset.yaml', 'w') as f:
     yaml.dump(yaml_content, f)
 
-models_dir = Path("./models")
-model_path = models_dir / YOLO_MODEL
+# models_dir = Path("./models")
+# model_path = models_dir / YOLO_MODEL
 
-model = YOLO(str(model_path))
-model.train(data=f'{config.yolo_path}/dataset.yaml', epochs=20, imgsz=640, batch=16, project="models", name="Finetune0.25", freeze=21)
+# model = YOLO(str(model_path))
+# model.train(data=f'{config.yolo_path}/dataset.yaml', epochs=20, imgsz=640, batch=16, project="models", name="Finetune0.25", freeze=21)
 
 val_dataset = Subset(dataset, val_idx)
 
-detector = YOLODetector(model_name=YOLO_MODEL, model=model, finetune=True)
+detector = YOLODetector(model_name=YOLO_MODEL, finetune=True)
 
-pipeline = EvaluationPipeline(detector)
+pipeline = NoDetectronPipeline(detector)
 
 start_time = time.time()
-metrics = pipeline(dataset, config.output_path, val_dataset, save=True) 
+
+pipeline(
+    dataset, 
+    output=config.output_path,
+    subset=val_dataset,
+    save=True
+)
+
 end_time = time.time()
 
-print("\nRESULTS")
-print(f"mAP@0.5  : {metrics['mAP50']:.4f}")
-print(f"mAP@0.75 : {metrics['mAP75']:.4f}")
-print(f"mAP      : {metrics['mAP']:.4f}")
-print(f"mIoU     : {metrics['mIoU']:.4f}")
-print(f"Execution time: {end_time - start_time:.2f} seconds")
+# print("\nRESULTS")
+# print(f"mAP@0.5  : {metrics['mAP50']:.4f}")
+# print(f"mAP@0.75 : {metrics['mAP75']:.4f}")
+# print(f"mAP      : {metrics['mAP']:.4f}")
+# print(f"mIoU     : {metrics['mIoU']:.4f}")
+# print(f"Execution time: {end_time - start_time:.2f} seconds")

@@ -69,6 +69,7 @@ class EvaluationPipeline():
         dataset : AICityDataset,
         output : str,
         subset = None,
+        initial_id : int = 0,
         save : bool = True
     ) -> Dict[str, float]:
         
@@ -85,7 +86,7 @@ class EvaluationPipeline():
                 shuffle=False    
             )
         
-        evaluator = dataset.create_evaluator()
+        
         
         width = dataset.width
         height = dataset.height
@@ -103,7 +104,7 @@ class EvaluationPipeline():
         # For mIoU calculation
         all_ious = []
 
-        for frame_id, (frame, coco_gt) in tqdm(enumerate(data_loader), desc="Processed frames: ", unit=" frames", total=len(data_loader)):
+        for frame_id, (frame, coco_gt) in tqdm(enumerate(data_loader, start=initial_id), desc="Processed frames: ", unit=" frames", total=len(data_loader)):
             
             frame = np.array(frame[0])
             

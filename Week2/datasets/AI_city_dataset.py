@@ -2,7 +2,7 @@
 Dataset class for the AI City Challenge dataset
 """
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import cv2
 import utils
 import torch
@@ -40,11 +40,12 @@ class AICityDataset(Dataset):
         if not ret:
             raise IndexError(f"Frame {index} not found")
         
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        coco_bboxes = self.annotations[index]["annotations"]
+        
         if self.evaluation_mode:
             
-            return frame, self.annotations[index]
-        
-        coco_bboxes = self.annotations[index]["annotations"]
+            return frame, {"boxes" : torch.tensor([bbox['bbox'] for bbox in coco_bboxes]), "labels" : torch.zeros(len(coco_bboxes), dtype=int)}
         
         yolo_boxes = []
         yolo_classes = []
@@ -103,7 +104,8 @@ class AICityDataset(Dataset):
         
         return gt_data, gt_dict
     
-    
+def collate_fn(batch):
+    return tuple(zip(*batch))
 
 if __name__ == "__main__":
     
@@ -111,4 +113,6 @@ if __name__ == "__main__":
     config = build_config(args, "yolo_run")
     dataset = AICityDataset(video_path=config.input_path, annotation_path=config.xml_path, evaluation=True)
     
-    print(dataset[212][1])
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=False, collate_fn=collate_fn)
+    
+    print(next(iter(dataloader))[1])
