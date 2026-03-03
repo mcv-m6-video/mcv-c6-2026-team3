@@ -1,7 +1,7 @@
 import time
 import os
 from pathlib import Path
-from trackers import IOUTracker
+from trackers import ByteTrackTracker
 from utils import set_args
 from pipelines import TrackingPipeline
 from config import build_config
@@ -10,15 +10,23 @@ import numpy as np
 import gc
 
 args = set_args()
-config = build_config(args, "study_sort", create=False)
+config = build_config(args, "study_bytetrack", create=False)
 TRAIN_PERCENTAGE = 0.25
 DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
 
-def objective(trial : optuna.Trial):
+def objective(trial: optuna.Trial):
     
-    iou_threshold = trial.suggest_float('iou_threshold', 0.0, 1.0)
+    track_thresh = trial.suggest_float('track_thresh', 0.1, 0.7)
+    track_buffer = trial.suggest_int('track_buffer', 5, 60)
+    match_thresh = trial.suggest_float('match_thresh', 0.5, 0.95)
+    frame_rate = 10
     
-    tracker = IOUTracker(iou_threshold=iou_threshold)
+    tracker = ByteTrackTracker(
+        track_thresh=track_thresh,
+        track_buffer=track_buffer,
+        match_thresh=match_thresh,
+        frame_rate=frame_rate
+    )
     
     pipeline = TrackingPipeline(tracker, detector=None)
     
@@ -41,7 +49,7 @@ def objective(trial : optuna.Trial):
 os.makedirs('results/studies', exist_ok=True)
     
 storage_name = "sqlite:///results/studies/optimization.db"
-study_name = "iou_params_study"
+study_name = "bytetrack_params_study"
 
 study = optuna.create_study(
     study_name=study_name,
@@ -51,7 +59,7 @@ study = optuna.create_study(
 )
 
 print(f"Initializing optimization for: {study_name}...")
-study.optimize(objective, n_trials=50, show_progress_bar=True)
+study.optimize(objective, n_trials=500, show_progress_bar=True)
 
 print(f"Number of Pareto optimal trials: {len(study.best_trials)}")
 print(f"\nBest trials (Pareto front):")

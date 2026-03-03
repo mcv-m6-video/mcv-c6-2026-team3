@@ -31,6 +31,7 @@ def main():
     TRACK_THRESH = 0.25  # Detection confidence threshold for track activation
     TRACK_BUFFER = 30    # Number of frames to keep lost tracks before deletion
     MATCH_THRESH = 0.8   # Matching threshold for first association (IoU)
+    
     FRAME_RATE = 10      # Frame rate of the video (AICity is 10 FPS)
     TRAIN_PERCENTAGE = 0.25
     DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
@@ -38,10 +39,6 @@ def main():
     config = build_config(args, "tracking_bytetrack_finetuned")
     
     print(f"Initializing ByteTrack Tracker")
-    print(f"  - Track threshold: {TRACK_THRESH}")
-    print(f"  - Track buffer: {TRACK_BUFFER} frames")
-    print(f"  - Match threshold: {MATCH_THRESH}")
-    print(f"  - Frame rate: {FRAME_RATE} FPS")
     
     tracker = ByteTrackTracker(
         track_thresh=TRACK_THRESH,
