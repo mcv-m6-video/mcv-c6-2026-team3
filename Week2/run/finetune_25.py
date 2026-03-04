@@ -10,15 +10,17 @@ import os
 import yaml
 from pathlib import Path
 import time
+from tqdm import tqdm
+import gc
 
 args = set_args()
     
 # Configuration parameters
-YOLO_MODEL = "best.pt"  # Use n for nano, s for small, m for medium, l for large
+YOLO_MODEL = "yolo26n.pt"  # Use n for nano, s for small, m for medium, l for large
 TRAIN_PERCENTAGE = 0.25
 FOLDS = 4
 
-config = build_config(args, "yolo_finetune_25_prob")
+config = build_config(args, "yolo_freezes")
 
 dataset = AICityDataset(
     config.input_path, 
@@ -55,29 +57,51 @@ with open(f'{config.yolo_path}/dataset.yaml', 'w') as f:
 models_dir = Path("./models")
 model_path = models_dir / YOLO_MODEL
 
-model = YOLO(str(model_path))
-model.train(data=f'{config.yolo_path}/dataset.yaml', epochs=20, imgsz=640, batch=16, project="models", name="Finetune0.25", freeze=11)
-
 val_dataset = Subset(dataset, val_idx)
 
-detector = YOLODetector(model_name=YOLO_MODEL, finetune=True, model=model)
+freezes = [8, 10, 12, 15, 16, 18, 20]
 
-pipeline = NoDetectronPipeline(detector)
+mAPs = []
 
-start_time = time.time()
+for freeze in tqdm(freezes, desc="Trainings: "):
 
-metrics = pipeline(
-    dataset, 
-    output=config.output_path,
-    subset=val_dataset,
-    save=True
-)
+    model = YOLO(str(model_path))
+    model.train(data=f'{config.yolo_path}/dataset.yaml', epochs=20, imgsz=640, batch=16, project="models", name=f"finetune_freeze{freeze}", freeze=freeze)
 
-end_time = time.time()
+    detector = YOLODetector(model_name=YOLO_MODEL, finetune=True, model=model)
 
-print("\nRESULTS")
-print(f"mAP@0.5  : {metrics['map_50']:.4f}")
-print(f"mAP@0.75 : {metrics['map_75']:.4f}")
-print(f"mAP      : {metrics['map']:.4f}")
-print(f"mIoU     : {metrics['miou']:.4f}")
-print(f"Execution time: {end_time - start_time:.2f} seconds")
+    pipeline = NoDetectronPipeline(detector)
+
+    start_time = time.time()
+    
+    os.makedirs(config.output_path / f"freeze{freeze}", exist_ok=True)
+
+    metrics = pipeline(
+        dataset, 
+        output=config.output_path / f"freeze{freeze}",
+        subset=val_dataset,
+        save=True
+    )
+
+    end_time = time.time()
+
+    print(f"\nRESULTS FREEZE {freeze}")
+    print(f"mAP@0.5  : {metrics['map_50']:.4f}")
+    print(f"mAP@0.75 : {metrics['map_75']:.4f}")
+    print(f"mAP      : {metrics['map']:.4f}")
+    print(f"mIoU     : {metrics['miou']:.4f}")
+    print(f"Execution time: {end_time - start_time:.2f} seconds")
+    
+    mAPs.append(metrics['map_50'])
+    
+    del model
+    del detector
+    del pipeline
+    gc.collect()
+    
+with open("results/freeze_results.txt", "w") as f:
+    
+    for idx, mAP in enumerate(mAPs):
+        f.write(f"Freeze : {freezes[idx]}\n")
+        f.write(f"\tmAP@50 : {mAP:.4f}\n")
+        f.write(f"----------------------------\n")
