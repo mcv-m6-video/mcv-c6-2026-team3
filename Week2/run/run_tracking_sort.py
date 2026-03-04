@@ -14,9 +14,9 @@ def main():
     args = set_args()
     
     # SORT Configuration parameters
-    MAX_AGE = 1  # Maximum number of frames to keep alive a track without associated detections
-    MIN_HITS = 3  # Minimum number of associated detections before track is confirmed
-    IOU_THRESHOLD = 0.3  # Minimum IoU for matching
+    MAX_AGE = 5  # Maximum number of frames to keep alive a track without associated detections
+    MIN_HITS = 5  # Minimum number of associated detections before track is confirmed
+    IOU_THRESHOLD = 0.1458  # Minimum IoU for matching
     TRAIN_PERCENTAGE = 0.25
     DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
     

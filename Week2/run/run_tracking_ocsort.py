@@ -32,14 +32,14 @@ def main():
     args = set_args()
     
     # OC-SORT Configuration parameters
-    DET_THRESH = 0.2      # Detection confidence threshold
-    MAX_AGE = 30          # Maximum number of frames to keep alive a track without detections
-    MIN_HITS = 3          # Minimum number of associated detections before track is confirmed
-    IOU_THRESHOLD = 0.3   # Minimum IoU for matching
-    DELTA_T = 3           # Time steps for observation-centric momentum
-    ASSO_FUNC = "iou"     # Association function: "iou", "giou", "ciou", "diou", "ct_dist"
-    INERTIA = 0.2         # Weight for observation-centric momentum
-    USE_BYTE = False      # Use ByteTrack-style second matching
+    DET_THRESH = 0.2069259351554724
+    MAX_AGE = 13
+    MIN_HITS = 5
+    IOU_THRESHOLD = 0.3164438451238905
+    DELTA_T = 2
+    ASSO_FUNC = "iou"
+    INERTIA = 0.22885026775270556
+    USE_BYTE = False
     
     TRAIN_PERCENTAGE = 0.25
     DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")

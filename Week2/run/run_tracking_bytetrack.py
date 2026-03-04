@@ -28,10 +28,10 @@ def main():
     args = set_args()
     
     # ByteTrack Configuration parameters
-    TRACK_THRESH = 0.25  # Detection confidence threshold for track activation
-    TRACK_BUFFER = 30    # Number of frames to keep lost tracks before deletion
-    MATCH_THRESH = 0.8   # Matching threshold for first association (IoU)
-    
+    TRACK_THRESH = 0.6859066160175378
+    TRACK_BUFFER = 60    # Number of frames to keep lost tracks before deletion
+    MATCH_THRESH = 0.6519245296076033
+
     FRAME_RATE = 10      # Frame rate of the video (AICity is 10 FPS)
     TRAIN_PERCENTAGE = 0.25
     DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
