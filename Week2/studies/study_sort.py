@@ -17,7 +17,7 @@ DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
 def objective(trial: optuna.Trial):
     
     max_age = trial.suggest_int('max_age', 1, 10)
-    min_hits = trial.suggest_int('min_hits', 1, 5)
+    min_hits = trial.suggest_int('min_hits', 1, 15)
     iou_threshold = trial.suggest_float('iou_threshold', 0.1, 0.9)
     
     tracker = SORTTracker(

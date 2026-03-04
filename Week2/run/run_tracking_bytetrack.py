@@ -29,8 +29,8 @@ def main():
     
     # ByteTrack Configuration parameters
     TRACK_THRESH = 0.6859066160175378
-    TRACK_BUFFER = 60    # Number of frames to keep lost tracks before deletion
-    MATCH_THRESH = 0.6519245296076033
+    TRACK_BUFFER = 60    # Number of frames to keep lost tracks before deletion (max age)
+    MATCH_THRESH = 0.6519245296076033  # IoU threshold for matching detections to tracks (iou threshold)
 
     FRAME_RATE = 10      # Frame rate of the video (AICity is 10 FPS)
     TRAIN_PERCENTAGE = 0.25

@@ -18,7 +18,7 @@ def objective(trial: optuna.Trial):
     
     det_thresh = trial.suggest_float('det_thresh', 0.1, 0.3)
     max_age = trial.suggest_int('max_age', 10, 50)
-    min_hits = trial.suggest_int('min_hits', 1, 5)
+    min_hits = trial.suggest_int('min_hits', 1, 15)
     iou_threshold = trial.suggest_float('iou_threshold', 0.2, 0.4)
     delta_t = trial.suggest_int('delta_t', 1, 5)
     asso_func = trial.suggest_categorical('asso_func', ['iou', 'giou', 'ciou', 'diou'])

@@ -32,14 +32,13 @@ def main():
     args = set_args()
     
     # OC-SORT Configuration parameters
-    DET_THRESH = 0.2069259351554724
-    MAX_AGE = 13
-    MIN_HITS = 5
-    IOU_THRESHOLD = 0.3164438451238905
-    DELTA_T = 2
+    DET_THRESH = 0.16142225183325365
+    MAX_AGE = 29
+    MIN_HITS = 12
+    IOU_THRESHOLD = 0.2986584337024822
+    DELTA_T = 3
     ASSO_FUNC = "iou"
     INERTIA = 0.22885026775270556
-    USE_BYTE = False
     
     TRAIN_PERCENTAGE = 0.25
     DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
@@ -50,7 +49,7 @@ def main():
     print(f"  - Association function: {ASSO_FUNC}")
     print(f"  - Delta T: {DELTA_T}")
     print(f"  - Inertia: {INERTIA}")
-    print(f"  - Use ByteTrack matching: {USE_BYTE}")
+    print(f"  - Use ByteTrack matching: {False}")
     
     tracker = OCSORTTracker(
         det_thresh=DET_THRESH,
@@ -60,7 +59,7 @@ def main():
         delta_t=DELTA_T,
         asso_func=ASSO_FUNC,
         inertia=INERTIA,
-        use_byte=USE_BYTE
+        use_byte=False
     )
     
     pipeline = TrackingPipeline(tracker, detector=None)
