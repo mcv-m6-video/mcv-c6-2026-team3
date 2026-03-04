@@ -19,7 +19,7 @@ def main():
     TRAIN_PERCENTAGE = 0.25
     DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
     
-    config = build_config(args, "tracking_from_detections_0.2_finetuned")
+    config = build_config(args, "tracking_iou_finetuned")
     
     print(f"Initializing IOU Tracker (threshold={IOU_THRESHOLD}, max_age={MAX_AGE})")
     tracker = IOUTracker(iou_threshold=IOU_THRESHOLD, max_age=MAX_AGE)
