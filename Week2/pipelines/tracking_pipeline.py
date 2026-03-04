@@ -135,9 +135,11 @@ def evaluate_tracking(pred_tracks: Dict, gt_tracks: Dict) -> Dict[str, float]:
 
 
 class TrackingPipeline:
-    def __init__(self, tracker, detector=None):
+    def __init__(self, tracker, detector=None, trail_length: int = 30):
         self.tracker = tracker
         self.detector = detector
+        self.trail_length = trail_length  # Number of frames to keep in trail history
+        self.track_history = {}  # {track_id: [(cx, cy), ...]} - central positions
         
     def __call__(self, 
                  input_path: Path, 
@@ -147,6 +149,7 @@ class TrackingPipeline:
                  detections_file: Optional[Path] = None,
                  save: bool = True) -> Dict[str, float]:
         self.tracker.reset()
+        self.track_history = {}  # Reset track history
         
         if detections_file:
             print(f"Loading detections from {detections_file}")
@@ -194,7 +197,33 @@ class TrackingPipeline:
                 tracked_objects = self.tracker.track(frame_detections, frame_id)
                 
                 if save:
-                    # Draw tracking results
+                    # Update track history with central positions
+                    for track_id, bbox in tracked_objects:
+                        x, y, w, h = bbox[:4]  # Ignore confidence score if present
+                        cx = int(x + w / 2)
+                        cy = int(y + h / 2)
+                        
+                        if track_id not in self.track_history:
+                            self.track_history[track_id] = []
+                        
+                        self.track_history[track_id].append((cx, cy))
+                        
+                        # Keep only last N positions
+                        if len(self.track_history[track_id]) > self.trail_length:
+                            self.track_history[track_id].pop(0)
+                    
+                    # Draw track trails
+                    for track_id, bbox in tracked_objects:
+                        if track_id in self.track_history and len(self.track_history[track_id]) > 1:
+                            # Get color for this track
+                            color = tuple([int(c) for c in np.random.RandomState(track_id).randint(0, 255, 3)])
+                            
+                            # Draw lines connecting the positions
+                            points = self.track_history[track_id]
+                            for i in range(1, len(points)):
+                                cv.line(frame, points[i-1], points[i], color, 2)
+                    
+                    # Draw tracking results (bounding boxes and IDs)
                     for track_id, bbox in tracked_objects:
                         x, y, w, h = bbox[:4]  # Ignore confidence score if present
                         x2, y2 = x + w, y + h

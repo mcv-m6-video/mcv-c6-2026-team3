@@ -15,13 +15,14 @@ def main():
     
     # Configuration parameters
     IOU_THRESHOLD = 0.1869655175330422 #Best parameter found with optuna
+    MAX_AGE = 5  # Frames to keep tracks alive during occlusions
     TRAIN_PERCENTAGE = 0.25
-    DETECTIONS_FILE = Path(f"{args.results}/yolo_finetune_25_prob/detections.txt")
+    DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
     
     config = build_config(args, "tracking_from_detections_0.2_finetuned")
     
-    print(f"Initializing IOU Tracker (threshold={IOU_THRESHOLD})")
-    tracker = IOUTracker(iou_threshold=IOU_THRESHOLD)
+    print(f"Initializing IOU Tracker (threshold={IOU_THRESHOLD}, max_age={MAX_AGE})")
+    tracker = IOUTracker(iou_threshold=IOU_THRESHOLD, max_age=MAX_AGE)
     
     pipeline = TrackingPipeline(tracker, detector=None)
     

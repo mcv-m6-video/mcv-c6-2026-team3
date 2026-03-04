@@ -17,8 +17,9 @@ DETECTIONS_FILE = Path(f"{args.results}/yolo_finetuned_run/detections.txt")
 def objective(trial : optuna.Trial):
     
     iou_threshold = trial.suggest_float('iou_threshold', 0.0, 1.0)
+    max_age = trial.suggest_int('max_age', 0, 30)
     
-    tracker = IOUTracker(iou_threshold=iou_threshold)
+    tracker = IOUTracker(iou_threshold=iou_threshold, max_age=max_age)
     
     pipeline = TrackingPipeline(tracker, detector=None)
     

@@ -5,11 +5,13 @@ from utils import compute_iou
 
 class IOUTracker:
     
-    def __init__(self, iou_threshold: float = 0.3):
+    def __init__(self, iou_threshold: float = 0.3, max_age: int = 5):
         self.iou_threshold = iou_threshold
+        self.max_age = max_age
         self.next_id = 1
         self.tracks = {}  # {frame_id: [(track_id, bbox), ...]}
         self.active_tracks = {}  # {track_id: bbox_xyxy}
+        self.track_ages = {}  # {track_id: age} - frames since last detection
         
     def xywh_to_xyxy(self, bbox):
         # Handle both 4-element (x,y,w,h) and 5-element (x,y,w,h,conf) tuples
@@ -32,6 +34,7 @@ class IOUTracker:
                 track_id = self.next_id
                 self.next_id += 1
                 self.active_tracks[track_id] = det_xyxy
+                self.track_ages[track_id] = 0
                 tracked_objects.append((track_id, det_xywh))
         else:
             # Match detections to existing tracks based on IoU
@@ -66,8 +69,9 @@ class IOUTracker:
                 matched_tracks.add(track_id)
                 matched_detections.add(det_idx)
                 
-                # Update active track with new bbox
+                # Update active track with new bbox and reset age
                 self.active_tracks[track_id] = detections_xyxy[det_idx]
+                self.track_ages[track_id] = 0
                 tracked_objects.append((track_id, detections[det_idx]))
                 
                 # Remove matched track and detection from matrix
@@ -80,12 +84,24 @@ class IOUTracker:
                     track_id = self.next_id
                     self.next_id += 1
                     self.active_tracks[track_id] = det_xyxy
+                    self.track_ages[track_id] = 0
                     tracked_objects.append((track_id, det_xywh))
             
-            # Remove unmatched tracks (lost objects)
+            # Handle unmatched tracks (potential occlusions)
+            tracks_to_remove = []
             for track_id in track_ids:
                 if track_id not in matched_tracks:
-                    del self.active_tracks[track_id]
+                    # Increment age of unmatched track
+                    self.track_ages[track_id] += 1
+                    
+                    # Remove track if it has been unmatched for too long
+                    if self.track_ages[track_id] >= self.max_age:
+                        tracks_to_remove.append(track_id)
+            
+            # Remove old tracks
+            for track_id in tracks_to_remove:
+                del self.active_tracks[track_id]
+                del self.track_ages[track_id]
         
         # Store tracking results
         self.tracks[frame_id] = tracked_objects
@@ -96,3 +112,4 @@ class IOUTracker:
         self.next_id = 1
         self.tracks = {}
         self.active_tracks = {}
+        self.track_ages = {}
