@@ -25,24 +25,23 @@ def compute_iou(box1, box2):
     return inter / union if union > 0 else 0.0
 
 
-def load_gt_tracks(xml_path: str, train_frames: int = 0) -> Dict[int, Dict]:
-    root = ET.parse(xml_path).getroot()
+def load_gt_tracks(txt_path: str, train_frames: int = 0) -> Dict[int, Dict]:
     gt_tracks = {}
-
-    for track in root.findall('track'):
-        if track.get('label') != 'car':
-            continue
-        tid = int(track.get('id'))
-        for box in track.findall('box'):
-            frame = int(box.get('frame'))
+    with open(txt_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(',')
+            frame = int(parts[0])
             if frame < train_frames:
                 continue
-            xtl = int(float(box.get('xtl')))
-            ytl = int(float(box.get('ytl')))
-            xbr = int(float(box.get('xbr')))
-            ybr = int(float(box.get('ybr')))
-            gt_tracks.setdefault(frame, {})[tid] = (xtl, ytl, xbr - xtl, ybr - ytl)
-
+            tid = int(parts[1])
+            x = int(float(parts[2]))
+            y = int(float(parts[3]))
+            w = int(float(parts[4]))
+            h = int(float(parts[5]))
+            gt_tracks.setdefault(frame, {})[tid] = (x, y, w, h)
     return gt_tracks
 
 

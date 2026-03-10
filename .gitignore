@@ -8,3 +8,6 @@ Week2/models/*.pt
 ZBS/
 __pycache__/
 runs
+AI_CITY*
+
+results/

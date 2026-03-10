@@ -7,8 +7,15 @@ import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
 from flow_tracker import FlowIOUTracker
-
+import csv
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+import os
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
 
 try:
     from evaluation.tracking_eval import load_gt_tracks, evaluate_tracking
@@ -17,9 +24,9 @@ except ImportError as e:
     load_gt_tracks = None
     evaluate_tracking = None
 
-DEFAULT_VIDEO      = os.path.join(SCRIPT_DIR, "../data/AICity_data/train/S03/c010/vdo.avi")
-DEFAULT_XML        = os.path.join(SCRIPT_DIR, "../data/ai_challenge_s03_c010-full_annotation.xml")
-DEFAULT_DETS       = os.path.join(SCRIPT_DIR, "detections.txt")
+DEFAULT_VIDEO      = os.path.join(SCRIPT_DIR, "../AI_CITY_CHALLENGE_2022_TRAIN/train/S03/c010/vdo.avi")
+DEFAULT_TXT        = os.path.join(SCRIPT_DIR, "../AI_CITY_CHALLENGE_2022_TRAIN/train/S03/c010/gt/gt.txt")
+DEFAULT_DETS       = os.path.join(SCRIPT_DIR, "results/S03/c010/detections.txt")
 DEFAULT_FF_DIR     = os.path.join(SCRIPT_DIR, "FlowFormerPlusPlus")
 DEFAULT_FF_CKPT    = os.path.join(SCRIPT_DIR, "FlowFormerPlusPlus", "checkpoints", "kitti.pth")
 DEFAULT_OUT        = os.path.join(SCRIPT_DIR, "tracking_output.mp4")
@@ -28,13 +35,14 @@ DEFAULT_OUT        = os.path.join(SCRIPT_DIR, "tracking_output.mp4")
 def parse_args():
     p = argparse.ArgumentParser(description="Flow-based IOU tracker with FlowFormer++")
     p.add_argument("--video",   default=DEFAULT_VIDEO,   help="Path to input video")
-    p.add_argument("--xml",     default=DEFAULT_XML,     help="Path to Ground Truth XML (for metrics)")
+    p.add_argument("--txt",     default=DEFAULT_TXT,     help="Path to Ground Truth XML (for metrics)")
     p.add_argument("--dets",    default=DEFAULT_DETS,    help="Path to detections .txt file")
     p.add_argument("--ff_ckpt", default=DEFAULT_FF_CKPT, help="Path to FlowFormer++ checkpoint")
     p.add_argument("--out",     default=DEFAULT_OUT,     help="Output video path")
     p.add_argument("--iou_thr", default=0.3, type=float, help="IOU threshold for tracker")
     p.add_argument("--max_age", default=5,   type=int,   help="Max frames to keep lost track")
     p.add_argument("--scale",   default=0.5, type=float, help="Scale factor for optical flow calculation (lower is faster/less VRAM)")
+    p.add_argument("--metrics_csv", default=None,             help="Path to write per-run metrics CSV")
     return p.parse_args()
 
 # Load FlowFormer++ (path resolved at runtime in main())
@@ -74,6 +82,14 @@ def compute_flow_between_frames(model, prev_frame, curr_frame, scale):
     
     return flow_u, flow_v
 
+def write_metrics_csv(csv_path, metrics):
+    os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["HOTA", "IDF1"])
+        writer.writeheader()
+        writer.writerow({"HOTA": metrics["HOTA"], "IDF1": metrics["IDF1"]})
+
+
 def main():
     args = parse_args()
 
@@ -82,7 +98,7 @@ def main():
         sys.path.insert(0, ff_dir)
 
     cfg = get_cfg()
-    model = torch.nn.DataParallel(build_flowformer(cfg))
+    model = torch.nn.DataParallel(build_flowformer(cfg)).cuda()
     checkpoint = torch.load(args.ff_ckpt, map_location="cpu")
     if "model" in checkpoint:
         model.load_state_dict(checkpoint["model"])
@@ -145,7 +161,7 @@ def main():
     if load_gt_tracks is not None and evaluate_tracking is not None:
         try:
             train_frames = int(total_frames * 0.25) if total_frames else 535
-            gt_tracks = load_gt_tracks(args.xml, train_frames=train_frames)
+            gt_tracks = load_gt_tracks(args.txt, train_frames=train_frames)
             pred_filtered = {k: v for k, v in pred_tracks_for_eval.items() if k >= train_frames}
             print(f"Evaluating from frame {train_frames}...")
             metrics = evaluate_tracking(pred_filtered, gt_tracks)
@@ -156,6 +172,10 @@ def main():
             print(f"HOTA: {metrics['HOTA']:.4f}")
             print(f"IDF1: {metrics['IDF1']:.4f}")
             print("="*30)
+            
+            if args.metrics_csv:
+                write_metrics_csv(args.metrics_csv, metrics)
+                print(f"Metrics saved to {args.metrics_csv}")
         except Exception as e:
             print(f"Error during metrics evaluation: {e}")
     else:

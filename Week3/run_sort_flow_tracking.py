@@ -11,6 +11,13 @@ from sort_tracker_flow import SORTTracker
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+import os
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+
 try:
     from evaluation.tracking_eval import load_gt_tracks, evaluate_tracking
 except ImportError as e:
