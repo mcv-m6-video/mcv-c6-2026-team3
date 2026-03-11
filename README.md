@@ -16,6 +16,12 @@ Object detection using YOLO models and multi-object tracking with different trac
 
 **[See Week2 README for detailed information](Week2/README.md)**
 
+### Week 3: Optical Flow and Flow-Guided Multi-Object Tracking
+
+Optical flow estimation with multiple methods (PyFlow, GMFlow, FlowFormer++, NeuFlow v2) and multi-object tracking enhanced with optical flow propagation (Flow-IOU, SORT+Flow, ByteTrack+Flow).
+
+**[See Week3 README for detailed information](Week3/README.md)**
+
 ## Installation
 
 Please refer to each week's README for specific installation instructions.
