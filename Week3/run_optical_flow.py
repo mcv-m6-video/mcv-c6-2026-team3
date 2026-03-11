@@ -98,9 +98,11 @@ def run_flowformer(img1_path, img2_path, checkpoint, ff_dir, target_h, target_w)
     padder = InputPadder(img1.shape)
     img1p, img2p = padder.pad(img1, img2)
 
+    torch.cuda.synchronize()
     t0 = time.time()
     with torch.no_grad():
         preds = model(img1p, img2p, {})
+    torch.cuda.synchronize()
     print(f"  FlowFormerPlusPlus elapsed: {time.time() - t0:.2f}s")
 
     flow = preds[-1]
@@ -169,9 +171,11 @@ def run_neuflow(img1_path, img2_path, nf_dir, target_h, target_w,
 
     img1, img2 = _load(img1_path), _load(img2_path)
 
+    torch.cuda.synchronize()
     t0 = time.time()
     with torch.no_grad():
         flow_raw = model(img1, img2)[-1][0]
+    torch.cuda.synchronize()
     print(f"  NeuFlow v2 elapsed: {time.time() - t0:.2f}s")
 
     flow_np  = flow_raw.permute(1, 2, 0).float().cpu().numpy()
@@ -219,6 +223,7 @@ def run_gmflow(img1_path, img2_path, checkpoint, gmflow_dir, target_h, target_w)
         img1 = F.pad(img1, (0, pad_w, 0, pad_h))
         img2 = F.pad(img2, (0, pad_w, 0, pad_h))
 
+    torch.cuda.synchronize()
     t0 = time.time()
     with torch.no_grad():
         out = model(
@@ -228,6 +233,7 @@ def run_gmflow(img1_path, img2_path, checkpoint, gmflow_dir, target_h, target_w)
             prop_radius_list=[-1],
             pred_bidir_flow=False,
         )
+    torch.cuda.synchronize()
     print(f"  GMFlow elapsed: {time.time() - t0:.2f}s")
 
     flow = out["flow_preds"][-1][:, :, :orig_h, :orig_w]
