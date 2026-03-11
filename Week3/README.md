@@ -114,3 +114,4 @@ To run detection and tracking across all sequences (S01, S03, S04) automatically
 python task_2.py
 ```
 
+This file checks what results have been computed from the dataset. For those that are missing, it first runs yolo to create the detection files, and then runs both run_flow_tracking_script.py and run_sort_flow_tracking_script.py for that sequence.
