@@ -25,3 +25,4 @@ def save_detections_txt(detections, filepath):
         for frame_id in sorted(detections.keys()):
             for x, y, w, h, conf in detections[frame_id]:
                 f.write(f"{frame_id},{x},{y},{w},{h},{conf}\n")
+        

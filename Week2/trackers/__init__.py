@@ -1,5 +1,5 @@
 from .iou_tracker import IOUTracker
-from .sort_tracker import SORTTracker
+from ...Week4.sort_tracker import SORTTracker
 from .bytetrack_tracker import ByteTrackTracker
 from .ocsort_tracker import OCSORTTracker
 

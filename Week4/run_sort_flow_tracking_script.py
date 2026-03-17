@@ -8,7 +8,7 @@ from tqdm import tqdm
 from collections import defaultdict
 import csv
 
-from sort_tracker_flow import SORTTracker
+from sort_tracker import SORTTracker
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -49,12 +49,6 @@ def parse_args():
     p.add_argument("--alpha",   default=0.5, type=float, help="0.0 = 100% Flow, 1.0 = 100% Kalman, 0.5 = Mix")
     return p.parse_args()
 
-# Load FlowFormer++
-if DEFAULT_FF_DIR not in sys.path:
-    sys.path.insert(0, DEFAULT_FF_DIR)
-from core.FlowFormer import build_flowformer
-from core.utils.utils import InputPadder
-from configs.kitti import get_cfg
 
 def load_detections(path):
     dets = defaultdict(list)
@@ -64,28 +58,6 @@ def load_detections(path):
             dets[int(f_id)].append([x, y, w, h])
     return dets
 
-def compute_flow_between_frames(model, prev_frame, curr_frame, scale):
-    """Computes the optical flow between two frames using FlowFormer."""
-    h, w = curr_frame.shape[:2]
-    new_w, new_h = int(w * scale), int(h * scale)
-    
-    img1_small = cv2.resize(prev_frame, (new_w, new_h))
-    img2_small = cv2.resize(curr_frame, (new_w, new_h))
-
-    img1 = torch.from_numpy(cv2.cvtColor(img1_small, cv2.COLOR_BGR2RGB)).permute(2,0,1).float().unsqueeze(0).cuda()
-    img2 = torch.from_numpy(cv2.cvtColor(img2_small, cv2.COLOR_BGR2RGB)).permute(2,0,1).float().unsqueeze(0).cuda()
-    
-    padder = InputPadder(img1.shape)
-    img1, img2 = padder.pad(img1, img2)
-    
-    with torch.no_grad():
-        preds = model(img1, img2, {})
-        flow = padder.unpad(preds[-1])[0].cpu().numpy()
-    
-    flow_u = cv2.resize(flow[0], (w, h)) * (w / new_w)
-    flow_v = cv2.resize(flow[1], (w, h)) * (h / new_h)
-    
-    return flow_u, flow_v
 
 def write_metrics_csv(csv_path, metrics):
     os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
@@ -103,14 +75,7 @@ def main():
     if ff_dir not in sys.path:
         sys.path.insert(0, ff_dir)
 
-    # Setup Model
-    cfg = get_cfg()
-    model = torch.nn.DataParallel(build_flowformer(cfg)).cuda()
-    checkpoint = torch.load(args.ff_ckpt, map_location="cpu")
-    if "model" in checkpoint:
-        model.load_state_dict(checkpoint["model"])
-    else:
-        model.load_state_dict(checkpoint)
+
 
     print(f"Initializing SORT Tracker with alpha={args.alpha} (0: Flow, 1: Kalman, 0.5: Mix)")
     tracker = SORTTracker(iou_threshold=args.iou_thr, max_age=args.max_age, min_hits=args.min_hits)
@@ -127,25 +92,19 @@ def main():
     out_file = open(out_txt_path, 'w')
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or None
-    prev_frame = None
+
     f_id = 0
     
     pred_tracks_for_eval = {}
 
-    for _ in tqdm(range(total_frames) if total_frames else iter(int, 1), desc="Tracking (Hybrid SORT)"):
+    for _ in tqdm(range(total_frames) if total_frames else iter(int, 1), desc="Tracking"):
         ret, frame = cap.read()
         if not ret: break
         
-        flow_u, flow_v = None, None
-        if prev_frame is not None:
-            flow_u, flow_v = compute_flow_between_frames(model, prev_frame, frame, scale=args.scale)
-
         frame_dets = detections.get(f_id, [])
-        results = tracker.track(frame_dets, f_id, flow_u=flow_u, flow_v=flow_v, alpha=args.alpha)
+        results = tracker.track(frame_dets, f_id)
         
-        if flow_u is not None:
-            del flow_u, flow_v
-            torch.cuda.empty_cache()
+
 
         pred_tracks_for_eval[f_id] = []
 
@@ -163,7 +122,6 @@ def main():
             cv2.putText(frame, f"ID:{tid}", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
         
         out.write(frame)
-        prev_frame = frame.copy()
         f_id += 1
 
     cap.release(); out.release(); out_file.close()
