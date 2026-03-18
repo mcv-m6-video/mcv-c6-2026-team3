@@ -12,3 +12,15 @@ AI_CITY*
 
 results/
 tmp_scripts/
+Week3/logs/
+Week3/results/
+Week3/FlowFormerPlusPlus/
+job*
+*.pth
+*.safetensors
+*.sh
+*.err
+*.out
+
+Week4/outputs
+det_yolo.txt
