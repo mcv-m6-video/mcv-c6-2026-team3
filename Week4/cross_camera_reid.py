@@ -39,7 +39,7 @@ from collections import deque
 from threading import Lock
 from typing import Callable, Dict, List, Optional, Tuple
 
-from geo_utils import geo_distance
+from geo_utils import geo_distance, geo_to_local_vel, predict_geo
 
 
 # ---------------------------------------------------------------------------
@@ -126,18 +126,26 @@ class AppearanceBuffer:
     for the camera's timestamp offset.  Entries older than ``max_seconds`` are
     evicted.
 
+    Per-track GPS history is maintained to compute a moving-average velocity
+    (v_north_m_s, v_east_m_s).  ``get_tracks`` exposes this velocity so the
+    matcher can extrapolate predicted positions for cross-camera scoring.
+
     Parameters
     ----------
-    camera_id   : str   – human-readable label, e.g. "c001"
-    max_seconds : float – how many seconds of history to retain
+    camera_id       : str   – human-readable label, e.g. "c001"
+    max_seconds     : float – how many seconds of history to retain
+    velocity_window : int   – number of consecutive GPS samples used for the
+                              moving-average velocity estimate
     """
 
-    def __init__(self, camera_id: str, max_seconds: float = 3.0):
-        self.camera_id  = camera_id
-        self.max_seconds = max_seconds
-        # deque of (abs_time, global_track_id, crop_ndarray, geo_pos)
-        # geo_pos is (float, float) | None
+    def __init__(self, camera_id: str, max_seconds: float = 3.0,
+                 velocity_window: int = 5):
+        self.camera_id       = camera_id
+        self.max_seconds     = max_seconds
+        self.velocity_window = velocity_window
         self._entries: deque = deque()
+        # per-track ring-buffer of (abs_time, geo_pos) for velocity estimation
+        self._pos_history: Dict[int, deque] = {}
         self._lock = Lock()
 
     def add(
@@ -152,6 +160,14 @@ class AppearanceBuffer:
             self._entries.append((abs_time, global_track_id, crop, geo_pos))
             self._evict()
 
+            # Update per-track GPS history for velocity estimation
+            if geo_pos is not None:
+                if global_track_id not in self._pos_history:
+                    self._pos_history[global_track_id] = deque(
+                        maxlen=self.velocity_window
+                    )
+                self._pos_history[global_track_id].append((abs_time, geo_pos))
+
     def _evict(self):
         """Remove entries older than ``max_seconds`` relative to the latest entry."""
         if not self._entries:
@@ -161,6 +177,26 @@ class AppearanceBuffer:
         while self._entries and self._entries[0][0] < cutoff:
             self._entries.popleft()
 
+    def _compute_velocity(self, tid: int) -> Optional[Tuple[float, float]]:
+        """
+        Compute a moving-average (v_north_m_s, v_east_m_s) from the stored
+        GPS history for track ``tid``.  Returns ``None`` if fewer than 2
+        samples are available.
+        """
+        history = self._pos_history.get(tid)
+        if history is None or len(history) < 2:
+            return None
+        samples = list(history)
+        v_norths, v_easts = [], []
+        for (t_a, g_a), (t_b, g_b) in zip(samples[:-1], samples[1:]):
+            vel = geo_to_local_vel(g_a, t_a, g_b, t_b)
+            if vel is not None:
+                v_norths.append(vel[0])
+                v_easts.append(vel[1])
+        if not v_norths:
+            return None
+        return (float(np.mean(v_norths)), float(np.mean(v_easts)))
+
     def get_recent(self) -> List[Tuple]:
         """Return list of (abs_time, global_track_id, crop, geo_pos)."""
         with self._lock:
@@ -168,14 +204,17 @@ class AppearanceBuffer:
 
     def get_tracks(self) -> Dict[int, Tuple]:
         """
-        Return {global_track_id: (crop, abs_time, geo_pos)} for all tracks
-        currently in the buffer.  If a track has multiple entries, the newest
-        one is kept.
+        Return ``{tid: (crop, abs_time, geo_pos, velocity)}`` for all tracks
+        in the buffer.  ``velocity`` is ``(v_north_m_s, v_east_m_s)`` or
+        ``None`` when fewer than 2 GPS samples are available for that track.
         """
         with self._lock:
             result: Dict[int, Tuple] = {}
             for abs_time, tid, crop, geo_pos in self._entries:
-                result[tid] = (crop, abs_time, geo_pos)
+                result[tid] = (crop, abs_time, geo_pos, None)  # velocity filled below
+            for tid in result:
+                crop, abs_time, geo_pos, _ = result[tid]
+                result[tid] = (crop, abs_time, geo_pos, self._compute_velocity(tid))
             return result
 
 
@@ -215,9 +254,10 @@ class CrossCameraReIDMatcher:
         match_threshold: float = 0.6,
         lookback_seconds: float = 3.0,
         # --- geographic parameters ---
-        max_speed: float = 30.0,   # metres/sec (~108 km/h hard gate)
-        geo_sigma: float = 50.0,   # metres; distance-decay constant (exp(-d/sigma))
-        geo_weight: float = 0.3,
+        max_speed:       float = 30.0,  # metres/sec (~108 km/h hard gate)
+        geo_sigma:       float = 50.0,  # metres; distance-decay constant (exp(-d/sigma))
+        geo_weight:      float = 0.3,
+        velocity_window: int   = 5,     # GPS samples for moving-average velocity
     ):
         self.global_id_mgr   = global_id_mgr
         self.scorer_fn       = scorer_fn
@@ -226,6 +266,7 @@ class CrossCameraReIDMatcher:
         self.max_speed       = max_speed
         self.geo_sigma       = geo_sigma
         self.geo_weight      = geo_weight
+        self.velocity_window = velocity_window
 
         self._buffers: Dict[str, AppearanceBuffer] = {}
         self._lock = Lock()
@@ -239,7 +280,9 @@ class CrossCameraReIDMatcher:
         with self._lock:
             if camera_id not in self._buffers:
                 self._buffers[camera_id] = AppearanceBuffer(
-                    camera_id, max_seconds=self.lookback_seconds
+                    camera_id,
+                    max_seconds=self.lookback_seconds,
+                    velocity_window=self.velocity_window,
                 )
 
     def update_appearance(
@@ -347,26 +390,36 @@ class CrossCameraReIDMatcher:
             if cam_id == source_camera_id:
                 continue
 
-            for tid, (gallery_crop, gallery_abs_time, gallery_geo) in buffer.get_tracks().items():
+            for tid, (gallery_crop, gallery_abs_time, gallery_geo, gallery_vel) in buffer.get_tracks().items():
                 # --- Appearance score ---
                 app_score = self.scorer_fn(query_crop, gallery_crop)
 
                 # --- Geo score (optional) ---
                 if self.geo_weight > 0 and query_geo is not None and gallery_geo is not None:
-                    dist = geo_distance(query_geo, gallery_geo)
-                    dt   = abs(query_abs_time - gallery_abs_time)
+                    dt = query_abs_time - gallery_abs_time   # signed: +ve = query is later
 
-                    if dt > 0:
-                        speed = dist / dt
-                        if speed > self.max_speed:
-                            continue          # physically impossible – reject
-                        speed_score = 1.0 - speed / self.max_speed
+                    if gallery_vel is not None:
+                        # Velocity available: extrapolate position and score on error
+                        pred_geo   = predict_geo(gallery_geo, gallery_vel, dt)
+                        pred_error = geo_distance(pred_geo, query_geo)
+
+                        # Hard gate: prediction error implies implausible residual speed
+                        if abs(dt) > 0 and pred_error / abs(dt) > self.max_speed:
+                            continue
+
+                        geo_score = float(np.exp(-pred_error / max(self.geo_sigma, 1e-6)))
                     else:
-                        speed_score = 1.0 if dist < 1.0 else 0.0
+                        # Fallback: raw distance + speed gate (no velocity history yet)
+                        dist = geo_distance(query_geo, gallery_geo)
+                        if abs(dt) > 0:
+                            if dist / abs(dt) > self.max_speed:
+                                continue
+                        elif dist >= 1.0:
+                            continue
 
-                    dist_score = float(np.exp(-dist / max(self.geo_sigma, 1e-6)))
-                    geo_score  = 0.5 * speed_score + 0.5 * dist_score
-                    combined   = (1.0 - self.geo_weight) * app_score + self.geo_weight * geo_score
+                        geo_score = float(np.exp(-dist / max(self.geo_sigma, 1e-6)))
+
+                    combined = (1.0 - self.geo_weight) * app_score + self.geo_weight * geo_score
                 else:
                     combined = app_score
 

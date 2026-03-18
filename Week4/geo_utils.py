@@ -120,6 +120,46 @@ def load_timestamps(timestamp_path: str) -> Dict[str, float]:
     return offsets
 
 
+def geo_to_local_vel(
+    geo_a: Tuple[float, float],
+    t_a:   float,
+    geo_b: Tuple[float, float],
+    t_b:   float,
+) -> Optional[Tuple[float, float]]:
+    """
+    Compute a velocity vector (v_north_m_s, v_east_m_s) from two GPS fixes.
+
+    Uses a flat-earth approximation valid for the small displacements between
+    consecutive detections.
+
+    Returns ``None`` if ``dt`` is too small to give a reliable estimate.
+    """
+    dt = t_b - t_a
+    if abs(dt) < 1e-3:
+        return None
+    R = 6_371_000.0
+    lat_mid = np.radians((geo_a[0] + geo_b[0]) / 2.0)
+    v_north = np.radians(geo_b[0] - geo_a[0]) * R / dt
+    v_east  = np.radians(geo_b[1] - geo_a[1]) * R * np.cos(lat_mid) / dt
+    return (float(v_north), float(v_east))
+
+
+def predict_geo(
+    geo:    Tuple[float, float],
+    vel:    Tuple[float, float],
+    dt:     float,
+) -> Tuple[float, float]:
+    """
+    Extrapolate a GPS position forward by ``dt`` seconds using a (v_north, v_east)
+    velocity in m/s.  Uses the inverse flat-earth approximation.
+    """
+    R = 6_371_000.0
+    v_north, v_east = vel
+    lat = geo[0] + np.degrees(v_north * dt / R)
+    lon = geo[1] + np.degrees(v_east  * dt / (R * np.cos(np.radians(geo[0]))))
+    return (float(lat), float(lon))
+
+
 def bbox_foot_point(bbox) -> Tuple[float, float]:
     """
     Return the bottom-centre pixel of a bounding box [x, y, w, h].

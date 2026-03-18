@@ -54,6 +54,13 @@ from cross_camera_reid import (
 from sort_tracker import SORTTracker, ByteTrackMTMCTracker
 from geo_utils import load_homography, load_timestamps
 
+try:
+    from evaluation.tracking_eval import load_gt_tracks, evaluate_tracking
+except ImportError as e:
+    print(f"[WARNING] Evaluation module not available: {e}")
+    load_gt_tracks = None
+    evaluate_tracking = None
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 os.environ["CUDA_DEVICE_ORDER"]    = "PCI_BUS_ID"
@@ -107,6 +114,12 @@ def parse_args():
     p.add_argument("--lookback",  default=3.0,   type=float,
                    help="Seconds of history to search in other cameras")
 
+    # Evaluation
+    p.add_argument("--eval", action="store_true",
+                   help="Evaluate pruned global tracks against per-camera GT")
+    p.add_argument("--metrics_csv", default=None,
+                   help="Save per-camera + mean evaluation metrics to this CSV file")
+
     # Geographic enhancement
     p.add_argument("--geo_weight", default=0.3, type=float,
                    help="Blend weight for geo vs appearance [0=appearance only, 1=geo only]")
@@ -114,6 +127,27 @@ def parse_args():
                    help="Max plausible speed in metres/sec (hard gate). Default 30 m/s ≈ 108 km/h.")
     p.add_argument("--geo_sigma", default=50.0, type=float,
                    help="Geo distance-decay constant in metres: score = exp(-dist/geo_sigma).")
+    p.add_argument("--velocity_window", default=5, type=int,
+                   help="GPS samples for per-track moving-average velocity (default 5)")
+
+    # ------------------------------------------------------------------
+    # Grid search  (--grid_search enables; --gs_<param> specifies values)
+    # ------------------------------------------------------------------
+    p.add_argument("--grid_search", action="store_true",
+                   help="Sweep over --gs_* param grids and report best config")
+    p.add_argument("--gs_csv", default=None,
+                   help="Save full grid search results to this CSV (default: gs_results.csv in out_dir)")
+
+    # Each --gs_* takes one or more values; omitting it fixes that param at its default
+    p.add_argument("--gs_match_thr",       nargs="+", type=float, default=None)
+    p.add_argument("--gs_lookback",        nargs="+", type=float, default=None)
+    p.add_argument("--gs_geo_weight",      nargs="+", type=float, default=None)
+    p.add_argument("--gs_max_speed",       nargs="+", type=float, default=None)
+    p.add_argument("--gs_geo_sigma",       nargs="+", type=float, default=None)
+    p.add_argument("--gs_velocity_window", nargs="+", type=int,   default=None)
+    p.add_argument("--gs_iou_thr",         nargs="+", type=float, default=None)
+    p.add_argument("--gs_max_age",         nargs="+", type=int,   default=None)
+    p.add_argument("--gs_min_hits",        nargs="+", type=int,   default=None)
 
     return p.parse_args()
 
@@ -455,6 +489,7 @@ def run_mtmc(args):
         max_speed=args.max_speed,
         geo_sigma=args.geo_sigma,
         geo_weight=args.geo_weight if geo_active else 0.0,
+        velocity_window=args.velocity_window,
     )
 
     # ------------------------------------------------------------------
@@ -583,11 +618,190 @@ def run_mtmc(args):
     print(f"\n  Results written to {out_dir}/")
 
     # ------------------------------------------------------------------
-    # 8.  Optional video rendering (per-camera + montage)
+    # 8.  Per-camera evaluation against GT (optional)
+    # ------------------------------------------------------------------
+    if args.eval:
+        if load_gt_tracks is None or evaluate_tracking is None:
+            print("\n  [eval] Skipped – evaluation module not importable.")
+        else:
+            print(f"\n{'='*55}")
+            print(f"  MTMC Evaluation  (global IDs, multi-camera pruned)")
+            print(f"{'='*55}")
+
+            import csv as _csv
+            cam_metrics = {}
+
+            for cam in cameras:
+                gt_path = os.path.join(args.scenario_dir, cam, "gt", "gt.txt")
+                if not os.path.exists(gt_path):
+                    print(f"  [{cam}] No GT file at {gt_path} – skipped")
+                    continue
+
+                # Build pred_tracks: {frame_1idx: [(tid, (x,y,w,h)), ...]}
+                pred_tracks = defaultdict(list)
+                for (frame_1idx, tid, x, y, w, h) in all_results[cam]:
+                    if tid in valid_ids:
+                        pred_tracks[frame_1idx].append((tid, (x, y, w, h)))
+
+                gt_tracks = load_gt_tracks(gt_path, train_frames=0)
+
+                if not gt_tracks:
+                    print(f"  [{cam}] GT is empty – skipped")
+                    continue
+
+                try:
+                    metrics = evaluate_tracking(dict(pred_tracks), gt_tracks)
+                    cam_metrics[cam] = metrics
+                    print(f"  [{cam}]  HOTA={metrics['HOTA']:.4f}  IDF1={metrics['IDF1']:.4f}")
+                except Exception as exc:
+                    print(f"  [{cam}] Evaluation error: {exc}")
+
+            if cam_metrics:
+                mean_hota = float(np.mean([m["HOTA"] for m in cam_metrics.values()]))
+                mean_idf1 = float(np.mean([m["IDF1"] for m in cam_metrics.values()]))
+                print(f"  {'─'*45}")
+                print(f"  Mean           HOTA={mean_hota:.4f}  IDF1={mean_idf1:.4f}")
+                print(f"{'='*55}\n")
+
+                if args.metrics_csv:
+                    os.makedirs(os.path.dirname(args.metrics_csv) or ".", exist_ok=True)
+                    with open(args.metrics_csv, "w", newline="") as f:
+                        writer = _csv.DictWriter(f, fieldnames=["camera", "HOTA", "IDF1"])
+                        writer.writeheader()
+                        for cam, m in cam_metrics.items():
+                            writer.writerow({"camera": cam, "HOTA": m["HOTA"], "IDF1": m["IDF1"]})
+                        writer.writerow({"camera": "mean", "HOTA": mean_hota, "IDF1": mean_idf1})
+                    print(f"  Metrics saved → {args.metrics_csv}")
+
+                return {"HOTA": mean_hota, "IDF1": mean_idf1}
+
+    # ------------------------------------------------------------------
+    # 10.  Optional video rendering (per-camera + montage)
     # ------------------------------------------------------------------
     if args.write_video or args.montage:
         render_outputs(args, cameras, all_results, valid_ids,
                        timestamps, cam_fps, out_dir)
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Grid search
+# ---------------------------------------------------------------------------
+
+def grid_search(args):
+    """
+    Sweep over all combinations of --gs_* parameter lists, run run_mtmc for
+    each, and report the best configuration by mean HOTA.
+
+    Parameters not supplied via --gs_* keep their fixed values from the
+    corresponding base flags (e.g. --match_thr).
+
+    Output
+    ------
+    A CSV file (--gs_csv or <out_dir>/gs_results.csv) with one row per
+    combination, plus a summary of the best config printed to stdout.
+    """
+    import copy
+    import itertools
+    import contextlib
+    import csv as _csv
+
+    scenario_name = os.path.basename(args.scenario_dir.rstrip("/"))
+    base_out = args.out_dir or os.path.join(SCRIPT_DIR, "results", scenario_name)
+    gs_csv_path = args.gs_csv or os.path.join(base_out, "gs_results.csv")
+    os.makedirs(base_out, exist_ok=True)
+
+    # Parameter grid: name → list of values to try
+    # If --gs_<param> was not given, use the single fixed value from base args.
+    PARAM_FIELDS = [
+        ("match_thr",       "gs_match_thr",       float),
+        ("lookback",        "gs_lookback",         float),
+        ("geo_weight",      "gs_geo_weight",       float),
+        ("max_speed",       "gs_max_speed",        float),
+        ("geo_sigma",       "gs_geo_sigma",        float),
+        ("velocity_window", "gs_velocity_window",  int),
+        ("iou_thr",         "gs_iou_thr",          float),
+        ("max_age",         "gs_max_age",           int),
+        ("min_hits",        "gs_min_hits",          int),
+    ]
+
+    grid = {}
+    for param, gs_attr, _ in PARAM_FIELDS:
+        values = getattr(args, gs_attr, None)
+        grid[param] = values if values else [getattr(args, param)]
+
+    keys   = list(grid.keys())
+    combos = list(itertools.product(*[grid[k] for k in keys]))
+    n      = len(combos)
+
+    print(f"\n{'='*60}")
+    print(f"  Grid search: {n} combinations over {scenario_name}")
+    for k in keys:
+        if len(grid[k]) > 1:
+            print(f"    {k}: {grid[k]}")
+    print(f"  Results → {gs_csv_path}")
+    print(f"{'='*60}\n")
+
+    csv_fields = keys + ["HOTA", "IDF1"]
+    rows = []
+    best_row = None
+
+    with open(gs_csv_path, "w", newline="") as fcsv:
+        writer = _csv.DictWriter(fcsv, fieldnames=csv_fields)
+        writer.writeheader()
+
+        for i, combo in enumerate(combos):
+            # Build a patched args copy for this combination
+            run_args = copy.deepcopy(args)
+            desc_parts = []
+            for param, value in zip(keys, combo):
+                setattr(run_args, param, value)
+                if len(grid[param]) > 1:
+                    desc_parts.append(f"{param}={value}")
+
+            # Write to an isolated subdirectory so runs don't clobber each other
+            combo_tag = "_".join(desc_parts) or "default"
+            run_args.out_dir    = os.path.join(base_out, "gs", combo_tag)
+            run_args.eval       = True
+            run_args.write_video = False
+            run_args.montage    = False
+            run_args.metrics_csv = None   # handled by grid_search itself
+            os.makedirs(run_args.out_dir, exist_ok=True)
+
+            print(f"  [{i+1}/{n}] {combo_tag or 'default'}", end=" ... ", flush=True)
+
+            # Suppress per-run chatter
+            with open(os.devnull, "w") as devnull, \
+                 contextlib.redirect_stdout(devnull):
+                result = run_mtmc(run_args)
+
+            if result is None:
+                print("no GT – skipped")
+                continue
+
+            hota, idf1 = result["HOTA"], result["IDF1"]
+            print(f"HOTA={hota:.4f}  IDF1={idf1:.4f}")
+
+            row = dict(zip(keys, combo))
+            row["HOTA"] = hota
+            row["IDF1"]  = idf1
+            rows.append(row)
+            writer.writerow(row)
+            fcsv.flush()
+
+            if best_row is None or hota > best_row["HOTA"]:
+                best_row = row
+
+    print(f"\n{'='*60}")
+    print(f"  Grid search complete ({len(rows)}/{n} runs evaluated)")
+    if best_row:
+        print(f"  Best config (HOTA={best_row['HOTA']:.4f}  IDF1={best_row['IDF1']:.4f}):")
+        for k in keys:
+            if len(grid[k]) > 1:
+                print(f"    --{k} {best_row[k]}")
+    print(f"  Full results → {gs_csv_path}")
+    print(f"{'='*60}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -596,4 +810,7 @@ def run_mtmc(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    run_mtmc(args)
+    if args.grid_search:
+        grid_search(args)
+    else:
+        run_mtmc(args)
