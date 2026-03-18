@@ -39,6 +39,7 @@ import argparse
 import os
 import sys
 import glob
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -60,6 +61,89 @@ except ImportError as e:
     print(f"[WARNING] Evaluation module not available: {e}")
     load_gt_tracks = None
     evaluate_tracking = None
+
+try:
+    from aic_eval import (
+        load_aic_gt_for_sequence, merge_cam_outputs,
+        run_aic_eval, print_aic_results,
+    )
+    _HAVE_AIC = True
+except ImportError:
+    _HAVE_AIC = False
+
+
+# ---------------------------------------------------------------------------
+# Siamese appearance scorer
+# ---------------------------------------------------------------------------
+
+class SiameseScorer:
+    """
+    Wraps the ResNet18-based Siamese feature extractor from
+    run_multicamera_bytetrack_reid.py into the scorer_fn interface:
+
+        scorer(crop_a, crop_b) -> float  (cosine similarity, range [-1, 1])
+
+    Falls back to -1.0 (no similarity) when either crop is None or too small.
+    """
+
+    _TRANSFORM = None   # built lazily, shared across instances
+
+    def __init__(self, ckpt_path: str, device: str = "cuda"):
+        import torch
+        import torch.nn as nn
+        import torchvision.models as models
+        from torchvision import transforms
+
+        self.device = torch.device(
+            device if device == "cuda" and torch.cuda.is_available() else "cpu"
+        )
+
+        # Same architecture as run_multicamera_bytetrack_reid.py
+        resnet_base = models.resnet18(weights=None)
+        extractor   = nn.Sequential(*(list(resnet_base.children())[:-1]))
+        self.model  = nn.Sequential(
+            extractor,
+            nn.Flatten(),
+            nn.BatchNorm1d(512),
+        ).to(self.device)
+
+        import torch as _torch
+        ckpt = _torch.load(ckpt_path, map_location=self.device)
+        state_dict = ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
+
+        if SiameseScorer._TRANSFORM is None:
+            SiameseScorer._TRANSFORM = transforms.Compose([
+                transforms.ToPILImage(),
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225]),
+            ])
+        self._transform = SiameseScorer._TRANSFORM
+
+    def _embed(self, crop: np.ndarray) -> Optional[np.ndarray]:
+        """Extract a 512-d L2-normalised embedding from a BGR crop."""
+        import torch, torch.nn.functional as F
+        if crop is None or crop.size == 0:
+            return None
+        rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+        tensor = self._transform(rgb).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            emb = self.model(tensor)
+            emb = F.normalize(emb, p=2, dim=1)
+        return emb.squeeze(0).cpu().numpy()
+
+    def __call__(self, crop_a: Optional[np.ndarray], crop_b: Optional[np.ndarray]) -> float:
+        ea = self._embed(crop_a)
+        eb = self._embed(crop_b)
+        if ea is None or eb is None:
+            return -1.0
+        denom = float(np.linalg.norm(ea) * np.linalg.norm(eb))
+        if denom == 0:
+            return -1.0
+        return float(np.dot(ea, eb) / denom)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -91,8 +175,14 @@ def parse_args():
     p.add_argument("--tile_h", default=360, type=int,
                    help="Height of each camera tile in the montage (default 360)")
 
+    # Detection filtering
+    p.add_argument("--conf_thr", default=0.0, type=float,
+                   help="Discard detections below this confidence (default: 0.0 = keep all)")
+    p.add_argument("--use_roi", action="store_true",
+                   help="Filter detections whose foot-point falls outside the camera ROI mask")
+
     # Tracker selection
-    p.add_argument("--tracker", default="sort", choices=["sort", "bytetrack"],
+    p.add_argument("--tracker", default="bytetrack", choices=["sort", "bytetrack"],
                    help="Single-camera tracker backend (default: sort)")
 
     # SORT hyper-parameters
@@ -119,6 +209,11 @@ def parse_args():
                    help="Evaluate pruned global tracks against per-camera GT")
     p.add_argument("--metrics_csv", default=None,
                    help="Save per-camera + mean evaluation metrics to this CSV file")
+    p.add_argument("--aic_eval", action="store_true",
+                   help="Run official AIC IDF1 evaluation (motmetrics) after tracking")
+    p.add_argument("--aic_gt", default=None,
+                   help="Path to AIC ground_truth_train.txt "
+                        "(default: ../AI_CITY_CHALLENGE_2022_TRAIN/eval/ground_truth_train.txt)")
 
     # Geographic enhancement
     p.add_argument("--geo_weight", default=0.3, type=float,
@@ -129,6 +224,14 @@ def parse_args():
                    help="Geo distance-decay constant in metres: score = exp(-dist/geo_sigma).")
     p.add_argument("--velocity_window", default=5, type=int,
                    help="GPS samples for per-track moving-average velocity (default 5)")
+
+    # Appearance scorer
+    p.add_argument("--scorer", default="histogram", choices=["histogram", "siamese"],
+                   help="Appearance scorer for cross-camera ReID (default: histogram)")
+    p.add_argument("--siamese_ckpt", default=None,
+                   help="Path to Siamese model checkpoint (.pt). Required when --scorer siamese")
+    p.add_argument("--device", default="cuda",
+                   help="Torch device for Siamese model (default: cuda)")
 
     # ------------------------------------------------------------------
     # Grid search  (--grid_search enables; --gs_<param> specifies values)
@@ -148,6 +251,7 @@ def parse_args():
     p.add_argument("--gs_iou_thr",         nargs="+", type=float, default=None)
     p.add_argument("--gs_max_age",         nargs="+", type=int,   default=None)
     p.add_argument("--gs_min_hits",        nargs="+", type=int,   default=None)
+    p.add_argument("--gs_conf_thr",        nargs="+", type=float, default=None)
 
     return p.parse_args()
 
@@ -165,10 +269,32 @@ def discover_cameras(scenario_dir: str):
     return cams
 
 
-def load_detections(path: str):
+def load_roi_mask(scenario_dir: str, cam: str):
+    """Load roi.jpg for a camera as a binary mask (True = valid region).  Returns None if missing."""
+    roi_path = os.path.join(scenario_dir, cam, "roi.jpg")
+    if not os.path.exists(roi_path):
+        return None
+    mask = cv2.imread(roi_path, cv2.IMREAD_GRAYSCALE)
+    return mask > 128 if mask is not None else None
+
+
+def load_detections(path: str, conf_thr: float = 0.0, roi_mask=None):
     """
-    Load detections from a MOTChallenge-format .txt file.
-    Returns {frame_id (0-indexed): [[x, y, w, h], ...]}
+    Load detections from a .txt file.  Two formats are supported:
+
+    6-column (pipeline output, 0-indexed frames):
+        frame, x, y, w, h, conf
+
+    MOTChallenge (10-column, 1-indexed frames):
+        frame, id, x, y, w, h, conf, -1, -1, -1
+
+    Parameters
+    ----------
+    conf_thr : float  – discard detections with confidence below this value
+    roi_mask : bool ndarray | None – if given, discard detections whose
+               foot-point (bottom-centre) falls outside the white ROI region
+
+    Returns {frame_id (0-indexed): [[x, y, w, h, conf], ...]}
     """
     dets = defaultdict(list)
     if not os.path.exists(path):
@@ -180,10 +306,25 @@ def load_detections(path: str):
             if not line:
                 continue
             parts = line.split(",")
-            # MOT format: frame, id_or_-1, left, top, width, height, conf, ...
-            frame_1idx = int(float(parts[0]))
-            x, y, w, h = (float(parts[i]) for i in (2, 3, 4, 5))
-            dets[frame_1idx - 1].append([x, y, w, h])   # convert to 0-indexed
+            if len(parts) == 6:
+                frame_0idx = int(float(parts[0]))
+                x, y, w, h, conf = (float(parts[i]) for i in (1, 2, 3, 4, 5))
+            else:
+                frame_0idx = int(float(parts[0])) - 1
+                x, y, w, h, conf = (float(parts[i]) for i in (2, 3, 4, 5, 6))
+
+            if conf < conf_thr:
+                continue
+
+            if roi_mask is not None:
+                h_mask, w_mask = roi_mask.shape
+                cx = min(int(x + w / 2), w_mask - 1)
+                cy = min(int(y + h),     h_mask - 1)
+                cx = max(cx, 0); cy = max(cy, 0)
+                if not roi_mask[cy, cx]:
+                    continue
+
+            dets[frame_0idx].append([x, y, w, h, conf])
     return dets
 
 
@@ -416,6 +557,17 @@ def render_outputs(args, cameras, all_results, valid_ids,
 # Core pipeline
 # ---------------------------------------------------------------------------
 
+def _build_scorer(args):
+    """Return the appearance scorer callable based on --scorer."""
+    if args.scorer == "siamese":
+        if not args.siamese_ckpt:
+            raise ValueError("--siamese_ckpt is required when --scorer siamese")
+        print(f"  Scorer       : Siamese (ckpt={args.siamese_ckpt}, device={args.device})")
+        return SiameseScorer(args.siamese_ckpt, device=args.device)
+    print(f"  Scorer       : histogram")
+    return histogram_scorer
+
+
 def run_mtmc(args):
     scenario_name = os.path.basename(args.scenario_dir.rstrip("/"))
     out_dir = args.out_dir or os.path.join(SCRIPT_DIR, "results", scenario_name)
@@ -483,7 +635,7 @@ def run_mtmc(args):
 
     reid_matcher = CrossCameraReIDMatcher(
         global_id_mgr=global_id_mgr,
-        scorer_fn=histogram_scorer,         # ← swap this to use a different scorer
+        scorer_fn=_build_scorer(args),
         match_threshold=args.match_thr,
         lookback_seconds=args.lookback,
         max_speed=args.max_speed,
@@ -535,8 +687,13 @@ def run_mtmc(args):
 
         # Detections
         det_path = find_detection_file(args.scenario_dir, cam, args.dets_dir)
-        print(f"  [{cam}] Using detections: {det_path}")
-        detections[cam] = load_detections(det_path)
+        roi_mask = load_roi_mask(args.scenario_dir, cam) if args.use_roi else None
+        if args.use_roi:
+            status = "loaded" if roi_mask is not None else "NOT FOUND"
+            print(f"  [{cam}] Using detections: {det_path}  ROI: {status}  conf_thr: {args.conf_thr}")
+        else:
+            print(f"  [{cam}] Using detections: {det_path}  conf_thr: {args.conf_thr}")
+        detections[cam] = load_detections(det_path, conf_thr=args.conf_thr, roi_mask=roi_mask)
 
         # Video capture
         vid_path = os.path.join(args.scenario_dir, cam, "vdo.avi")
@@ -673,7 +830,40 @@ def run_mtmc(args):
                         writer.writerow({"camera": "mean", "HOTA": mean_hota, "IDF1": mean_idf1})
                     print(f"  Metrics saved → {args.metrics_csv}")
 
-                return {"HOTA": mean_hota, "IDF1": mean_idf1}
+                ret = {"HOTA": mean_hota, "IDF1": mean_idf1}
+
+                # AIC official evaluation (IDF1 via motmetrics, all cameras jointly)
+                if getattr(args, "aic_eval", False):
+                    if not _HAVE_AIC:
+                        print("  [AIC eval] Skipped – aic_eval module not importable")
+                    else:
+                        aic_gt_path = getattr(args, "aic_gt", None) or os.path.normpath(
+                            os.path.join(SCRIPT_DIR, "..", "AI_CITY_CHALLENGE_2022_TRAIN",
+                                         "eval", "ground_truth_train.txt")
+                        )
+                        gt_df = load_aic_gt_for_sequence(aic_gt_path, scenario_name)
+                        pred_df = merge_cam_outputs(out_dir, cameras, filename="mtmc_sort_reid.txt")
+                        aic_res = run_aic_eval(pred_df, gt_df)
+                        print_aic_results(aic_res, label=f"AIC  {scenario_name}")
+                        ret["AIC_IDF1"] = aic_res["idf1"]
+
+                return ret
+
+    # ------------------------------------------------------------------
+    # AIC evaluation when --aic_eval but no per-camera GT (eval only path)
+    # ------------------------------------------------------------------
+    if getattr(args, "aic_eval", False):
+        if not _HAVE_AIC:
+            print("  [AIC eval] Skipped – aic_eval module not importable")
+        else:
+            aic_gt_path = getattr(args, "aic_gt", None) or os.path.normpath(
+                os.path.join(SCRIPT_DIR, "..", "AI_CITY_CHALLENGE_2022_TRAIN",
+                             "eval", "ground_truth_train.txt")
+            )
+            gt_df = load_aic_gt_for_sequence(aic_gt_path, scenario_name)
+            pred_df = merge_cam_outputs(out_dir, cameras, filename="mtmc_sort_reid.txt")
+            aic_res = run_aic_eval(pred_df, gt_df)
+            print_aic_results(aic_res, label=f"AIC  {scenario_name}")
 
     # ------------------------------------------------------------------
     # 10.  Optional video rendering (per-camera + montage)
@@ -724,6 +914,7 @@ def grid_search(args):
         ("iou_thr",         "gs_iou_thr",          float),
         ("max_age",         "gs_max_age",           int),
         ("min_hits",        "gs_min_hits",          int),
+        ("conf_thr",        "gs_conf_thr",          float),
     ]
 
     grid = {}

@@ -21,6 +21,10 @@ job*
 *.sh
 *.err
 *.out
-
+*.png
 Week4/outputs
 det_yolo.txt
+
+models
+unused
+checkpoint
