@@ -1,5 +1,7 @@
 # MCV C6 2026 - Team 3
 
+**[Project 1 Slides](https://docs.google.com/presentation/d/1MubxRYjxXAoclhzssCOpOrM9OaoYEi0vgipMbtTIt20/edit?usp=sharing)**
+
 ## Project Overview
 
 This repository contains the work for the Computer Vision course (C6) at MCV 2026 of Team 3.
