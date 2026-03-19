@@ -27,7 +27,7 @@ import numpy as np
 
 # Make Week4 modules importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import main as mtmc
+import Week4.online_mtmc as mtmc
 
 DETECTORS  = ["default", "finetuned", "large"]
 SEQUENCES  = ["S01", "S03", "S04"]

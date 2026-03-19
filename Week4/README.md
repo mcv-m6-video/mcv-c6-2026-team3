@@ -83,3 +83,99 @@ python run_multicamera_bytetrack_reid.py \
 ```
 
 ## GPS-based Tracking Approaches
+
+### Online MTMC (main.py)
+
+Per-frame tracking with SORT or ByteTrack, augmented with a cross-camera ReID matcher that gates proposals using GPS distance, travel speed, and appearance (histogram or Siamese embeddings). Cameras are time-synchronised via `cam_timestamp` offsets.
+
+```bash
+# Run on Sequence 3 with finetuned detections and evaluate with AIC metric
+python main.py \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --dets_dir results/finetuned/S03 \
+    --tracker bytetrack \
+    --scorer siamese --siamese_ckpt checkpoints/siamese_best.pth \
+    --conf_thr 0.3 --use_roi \
+    --eval --aic_eval
+```
+
+Grid search over matching hyperparameters:
+
+```bash
+python main.py \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --dets_dir results/finetuned/S03 \
+    --grid_search --metrics_csv results/online_gs.csv \
+    --gs_lookback 10 20 --gs_geo_sigma 30 100 --gs_conf_thr 0.3 0.4
+```
+
+### Offline MTMC (offline_mtmc.py)
+
+Runs local tracking per camera, builds **tracklets** with GPS velocity profiles, filters parked vehicles by pixel displacement, then matches tracklets across cameras with a greedy algorithm scoring temporal overlap, GPS proximity, velocity similarity, and appearance.
+
+```bash
+# Best configuration found via grid search on S03
+python offline_mtmc.py \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --dets_dir results/finetuned/S03 \
+    --conf_thr 0.3 \
+    --match_thr 0.4 \
+    --max_time_gap 60.0 \
+    --max_speed 30.0 \
+    --geo_sigma 100.0 \
+    --w_geo 0.5 --w_vel 0.2 --w_app 0.4 \
+    --eval --aic_eval \
+    --montage --write_video
+```
+
+Grid search over all matching parameters:
+
+```bash
+python offline_mtmc.py \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --dets_dir results/finetuned/S03 \
+    --grid_search --gs_csv results/offline/S03/gs_results.csv \
+    --gs_match_thr 0.3 0.4 0.5 \
+    --gs_geo_sigma 30 50 100 \
+    --gs_w_geo 0.3 0.4 0.5 \
+    --gs_w_app 0.3 0.4 0.5
+```
+
+### Per-car GPS visualisation (track_visualizer.py)
+
+Generates a video for a chosen global car ID showing a live GPS dot on an OpenStreetMap tile (left) and a synchronised camera grid with bounding boxes (right).
+
+```bash
+# List all available global IDs and how many cameras each appears in
+python track_visualizer.py \
+    --out_dir results/offline/S03 \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --list_ids
+
+# Render car ID 2
+python track_visualizer.py \
+    --out_dir results/offline/S03 \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --car_id 2 --output results/offline/S03/car_2.mp4
+```
+
+### Detector comparison (compare_detectors.py)
+
+Runs the full MTMC pipeline for each detector variant (default / finetuned / large) across all sequences and prints a comparison table.
+
+```bash
+python compare_detectors.py \
+    --scenario_dirs ../AI_CITY_CHALLENGE_2022_TRAIN/train/S01 \
+                    ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --conf_thr 0.3 --use_roi
+```
+
+### GPS ROI map (plot_roi_gps.py)
+
+Projects each camera's region-of-interest mask onto a shared GPS map to verify geographic coverage.
+
+```bash
+python plot_roi_gps.py \
+    --scenario_dir ../AI_CITY_CHALLENGE_2022_TRAIN/train/S03 \
+    --output map_roi_s03.png
+```

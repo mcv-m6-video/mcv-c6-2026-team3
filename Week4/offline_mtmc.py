@@ -46,7 +46,7 @@ from geo_utils import (
     pixel_to_geo, geo_distance, geo_to_local_vel, predict_geo, bbox_foot_point,
 )
 from cross_camera_reid import histogram_scorer
-from main import (
+from Week4.online_mtmc import (
     load_detections, find_detection_file, discover_cameras,
     load_roi_mask, SiameseScorer, _build_scorer,
     render_outputs,

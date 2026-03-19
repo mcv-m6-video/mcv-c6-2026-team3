@@ -32,7 +32,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from geo_utils import load_homography, load_timestamps, pixel_to_geo, bbox_foot_point
+from utils.geo_utils import load_homography, load_timestamps, pixel_to_geo, bbox_foot_point
 
 try:
     import contextily as ctx
