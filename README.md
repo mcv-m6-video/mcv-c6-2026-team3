@@ -22,6 +22,12 @@ Optical flow estimation with multiple methods (PyFlow, GMFlow, FlowFormer++, Neu
 
 **[See Week3 README for detailed information](Week3/README.md)**
 
+### Week 4: Multi-Target Multi-Camera Tracking with Re-Identification
+
+Multi-camera tracking using ByteTrack with Siamese ReID embeddings. Includes training a ResNet-18 based Siamese network for vehicle re-identification and cross-camera track association. This week also includes GPS-based tracking and GPS+Siamese combination methods.
+
+**[See Week4 README for detailed information](Week4/README.md)**
+
 ## Installation
 
 Please refer to each week's README for specific installation instructions.
