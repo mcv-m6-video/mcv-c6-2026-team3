@@ -9,6 +9,7 @@ ZBS/
 __pycache__/
 runs
 AI_CITY*
+SoccerNet
 
 results/
 tmp_scripts/
@@ -22,6 +23,7 @@ job*
 *.err
 *.out
 *.png
+*.ckpt
 Week4/outputs
 det_yolo.txt
 
