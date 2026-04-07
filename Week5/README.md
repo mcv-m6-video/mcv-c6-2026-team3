@@ -30,6 +30,10 @@ Here, `<model_name>` can be chosen freely but must match the name of a configura
 
 For additional details on configuration options using the configuration file, refer to the README in the [config](/config/) directory.
 
+## Acces to the Best Model Checkpoint
+[Google Drive link to the model](https://drive.google.com/file/d/1hx59-lrTXbk6mgldTwpzVOys7AeDoH5F/view?usp=sharing)
+
+
 ## Important notes
 
 - Before running the model, ensure that you have downloaded the dataset frames and updated the directory-related configuration parameters in the relevant [config](/config/) files.
