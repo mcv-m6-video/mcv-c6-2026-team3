@@ -1,7 +1,7 @@
 ### Master in Computer Vision (Barcelona) 2025/26
 # Project 2 (Task 1) @ C6 - Video Analysis
 
-This repository provides the starter code for Task 1 of Project 2: Action classification on the SoccerNet Ball Action Spotting 2025 (SN-BAS-2025) dataset.
+This repository provides the code for Task 1 of Project 2: Action classification on the SoccerNet Ball Action Spotting 2025 (SN-BAS-2025) dataset.
 
 The installation of dependencies, how to obtain the dataset, and instructions on running the classification baseline are detailed next.
 
@@ -18,7 +18,7 @@ pip install -r requirements.txt
 Refer to the README files in the [data/soccernetball](/data/soccernetball) directory for instructions on how to download the SNABS2025 dataset, preparation of directories, and extraction of the video frames.
 
 
-## Running the baseline for Task 1
+## Running the Best Model for Task 1
 
 The `main_classification.py` is designed to train and evaluate the baseline using the settings specified in a configuration file. You can run `main_classification.py` using the following command:
 
@@ -26,7 +26,7 @@ The `main_classification.py` is designed to train and evaluate the baseline usin
 python3 main_classification.py --model <model_name>
 ```
 
-Here, `<model_name>` can be chosen freely but must match the name of a configuration file (e.g. `baseline.json`) located in the config directory [config](/config/). For example, to chose the baseline model, you would run: `python3 main_classification.py --model baseline`.
+Here, `<model_name>` can be chosen freely but must match the name of a configuration file (e.g. `baseline.json`) located in the config directory [config](/config/). For example, to chose the baseline model, you would run: `python3 main_classification.py --model baseline`. If you want to use the Best model, use: `--model ryn008`
 
 For additional details on configuration options using the configuration file, refer to the README in the [config](/config/) directory.
 
