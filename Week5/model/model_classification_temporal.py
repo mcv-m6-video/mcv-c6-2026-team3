@@ -9,46 +9,53 @@ from contextlib import nullcontext
 
 import timm
 import torch
-import torchvision.transforms as T
+import torchvision.transforms.v2 as T
 from torch import nn
 from tqdm import tqdm
+from util.focal_loss import FocalLoss
 
 from model.modules import BaseRGBModel, FCLayers, step
+import pytorchvideo.models.hub as hub
 
+import torchvision.models.video as video_models
 
-class Model(BaseRGBModel):
+class ModelTemporal(BaseRGBModel):
     class Impl(nn.Module):
         def __init__(self, args=None):
             super().__init__()
 
             self._feature_arch = args.feature_arch
 
-            if self._feature_arch.startswith(("rny002", "rny004", "rny008")):
-                features = timm.create_model(
-                    {
-                        "rny002": "regnety_002",
-                        "rny004": "regnety_004",
-                        "rny008": "regnety_008",
-                    }[self._feature_arch.rsplit("_", 1)[0]],
+            if self._feature_arch == "r2plus1d_18":
+                self._features = video_models.r2plus1d_18(weights=video_models.R2Plus1D_18_Weights.DEFAULT)
+            
+            elif self._feature_arch == "r3d_18":
+                self._features = video_models.r3d_18(weights=video_models.R3D_18_Weights.DEFAULT)
+
+            elif self._feature_arch == "r2plus1d_34":
+                self._features = torch.hub.load(
+                    "moabitcoin/ig65m-pytorch",
+                    "r2plus1d_34_8_kinetics",
+                    num_classes=400,
                     pretrained=True,
                 )
-                feat_dim = features.head.fc.in_features
-                features.head.fc = nn.Identity()
-                self._d = feat_dim
-            else:
-                raise NotImplementedError(args.feature_arch)
 
-            self._features = features
+            self._d = self._features.fc.in_features
+
+            for param in self._features.parameters():
+                param.requires_grad = False
+
+            for param in self._features.layer4[1].conv2.parameters():
+                param.requires_grad = True
+
+            self._features.fc = nn.Identity()
+
             self._fc = FCLayers(self._d, args.num_classes)
 
-            self.standarization = T.Compose(
-                [
-                    T.Normalize(
-                        mean=(0.485, 0.456, 0.406),
-                        std=(0.229, 0.224, 0.225),
-                    )
-                ]
-            )
+            self.standarization = T.Compose([
+                T.Normalize(mean = (0.43216, 0.394666, 0.37645), std = (0.22803, 0.22145, 0.216989))
+            ])
+
 
         def forward(self, x):
             x = self.normalize(x)
@@ -56,16 +63,13 @@ class Model(BaseRGBModel):
             batch_size, clip_len, channels, height, width = x.shape
 
             if self.training:
-                x = self.augment(x)
+                x = self.augment(x) #augmentation per-batch
 
-            x = self.standarize(x)
+            x = self.standarize(x) #standarization imagenet stats
 
-            im_feat = self._features(
-                x.view(-1, channels, height, width)
-            ).reshape(batch_size, clip_len, self._d)
+            x = x.permute(0, 2, 1, 3, 4)
 
-            # Temporal max-pooling
-            im_feat = torch.max(im_feat, dim=1)[0]
+            im_feat = self._features(x)
 
             # Classification head
             im_feat = self._fc(im_feat)
@@ -74,23 +78,22 @@ class Model(BaseRGBModel):
 
         def normalize(self, x):
             return x / 255.0
-
+        
         def augment(self, x):
             """
-            Apply temporally-consistent augmentations.
-            x: [B, T, C, H, W]
-            Same transform parameters are applied to all frames in a clip.
+            Apply the SAME random transform to all frames of a clip
+            by passing the whole clip tensor [L, C, H, W] to torchvision transforms.
             """
+
             B = x.size(0)
 
+            #We apply it clip wise so it is consistent among all frames from the same clip.
             for b in range(B):
                 clip = x[b]
 
-                # Flip
                 if torch.rand(1) < 0.5:
                     clip = torch.flip(clip, dims=[3])
 
-                # Color jitter (probabilístico)
                 if torch.rand(1) < 0.25:
                     brightness = torch.empty(1).uniform_(0.7, 1.2).item()
                     contrast = torch.empty(1).uniform_(0.7, 1.2).item()
@@ -102,7 +105,6 @@ class Model(BaseRGBModel):
                     clip = T.functional.adjust_saturation(clip, saturation)
                     clip = T.functional.adjust_hue(clip, hue)
 
-                # Blur
                 if torch.rand(1) < 0.25:
                     clip = T.functional.gaussian_blur(clip, kernel_size=5)
 
@@ -123,7 +125,7 @@ class Model(BaseRGBModel):
         if torch.cuda.is_available() and ("device" in args) and (args.device == "cuda"):
             self.device = "cuda"
 
-        self._model = Model.Impl(args=args)
+        self._model = ModelTemporal.Impl(args=args)
         self._model.print_stats()
         self._args = args
         self._model.to(self.device)
@@ -135,8 +137,11 @@ class Model(BaseRGBModel):
             print(pos_weight.detach().cpu().tolist())
             self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         else:
-            print("Using standard BCEWithLogitsLoss without class weights.")
-            self.loss_fn = nn.BCEWithLogitsLoss()
+            if args.use_focal_loss:
+                self.loss_fn = FocalLoss()
+            else:
+                print("Using standard BCEWithLogitsLoss without class weights.")
+                self.loss_fn = nn.BCEWithLogitsLoss()
 
     def epoch(self, loader, optimizer=None, scaler=None, lr_scheduler=None):
         if optimizer is None:

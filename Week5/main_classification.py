@@ -22,7 +22,9 @@ from torch.utils.data import DataLoader
 from util.io import load_json, store_json
 from util.eval_classification import evaluate
 from dataset.datasets import get_datasets
-from model.model_classification import Model
+from model.model_classification_mod import Model
+from model.model_classification_temporal import ModelTemporal
+from thop import profile
 
 
 def get_args():
@@ -57,6 +59,16 @@ def update_args(args, config):
     args.use_weighted_bce = config.get("use_weighted_bce", False)
     args.pos_weight_clip = float(config.get("pos_weight_clip", 20.0))
     args.pos_weight_eps = float(config.get("pos_weight_eps", 1.0))
+
+    #Optional flags for temporal handler
+    args.temporal_handler = config.get("temporal_handler", None)
+
+    #Optional flags for overfitting problems
+    args.freeze_backbone = config.get("freeze_backbone", False)
+    args.unfreeze_num = config.get("freeze_backbone", 0)
+    args.use_focal_loss = config.get("use_focal_loss", False)
+
+    #Optional flags for temporal feature extractors
 
     return args
 
@@ -201,7 +213,13 @@ def main(args):
     if args.use_weighted_bce:
         pos_weight = compute_pos_weight_from_stored_train_labels(args)
 
-    model = Model(args=args, pos_weight=pos_weight)
+    model = None
+
+    if args.feature_arch.startswith(("rny002", "rny004", "rny008")):
+        model = Model(args=args, pos_weight=pos_weight)
+    else:
+        model = ModelTemporal(args=args, pos_weight=pos_weight)
+
     optimizer, scaler = model.get_optimizer({"lr": args.learning_rate})
 
     if not args.only_test:
@@ -251,6 +269,13 @@ def main(args):
 
     print("START INFERENCE")
     model.load(torch.load(os.path.join(ckpt_dir, "checkpoint_best.pt")))
+
+    dummy_input = torch.randn(4, 50, 3, 398, 224).to(args.device)
+
+    macs, params = profile(model._model, inputs=(dummy_input, ))
+
+    print("MACs:", macs)
+    print("Params:", params)
 
     ap_score = evaluate(model, test_data)
 

@@ -1,0 +1,30 @@
+START TRAINING EPOCHS
+[Epoch 0] Train loss: 0.23472 Val loss: 0.16803
+New best mAP epoch!
+[Epoch 1] Train loss: 0.17623 Val loss: 0.15807
+New best mAP epoch!
+[Epoch 2] Train loss: 0.17623 Val loss: 0.14897
+New best mAP epoch!
+[Epoch 3] Train loss: 0.17534 Val loss: 0.14678
+New best mAP epoch!
+[Epoch 4] Train loss: 0.16958 Val loss: 0.15034
+[Epoch 5] Train loss: 0.16539 Val loss: 0.14834
+[Epoch 6] Train loss: 0.16569 Val loss: 0.14685
+[Epoch 7] Train loss: 0.16589 Val loss: 0.15000
+[Epoch 8] Train loss: 0.16182 Val loss: 0.14499
+New best mAP epoch!
+[Epoch 9] Train loss: 0.15882 Val loss: 0.14501
+[Epoch 10] Train loss: 0.15544 Val loss: 0.14360
+New best mAP epoch!
+[Epoch 11] Train loss: 0.15532 Val loss: 0.14284
+New best mAP epoch!
+[Epoch 12] Train loss: 0.15514 Val loss: 0.13815
+New best mAP epoch!
+[Epoch 13] Train loss: 0.15650 Val loss: 0.14082
+[Epoch 14] Train loss: 0.15366 Val loss: 0.14702
+[Epoch 15] Train loss: 0.15412 Val loss: 0.14231
+[Epoch 16] Train loss: 0.15325 Val loss: 0.14438
+[Epoch 17] Train loss: 0.15437 Val loss: 0.14004
+[Epoch 18] Train loss: 0.15335 Val loss: 0.13645
+New best mAP epoch!
+[Epoch 19] Train loss: 0.15447 Val loss: 0.14269
