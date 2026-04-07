@@ -1,0 +1,50 @@
+{
+  "frame_dir": "/ghome/group03/shinto/c6_soccer/SoccerNet/SN-BAS-2025/SN-BAS-2025_frames/398x224",
+  "save_dir": "/ghome/group03/shinto/c6_soccer/SoccerNet/SN-BAS-2025_savedata",
+  "labels_dir": "/ghome/group03/shinto/c6_soccer/SoccerNet/SN-BAS-2025",
+  "store_mode": "load",
+  "task": "classification",
+  "batch_size": 4,
+  "clip_len": 50,
+  "stride": 2,
+  "dataset": "soccernetball",
+  "epoch_num_frames": 500000,
+  "feature_arch": "rny002",
+  "learning_rate": 0.0008,
+  "num_classes": 12,
+  "num_epochs": 35,
+  "warm_up_epochs": 3,
+  "only_test": false,
+  "device": "cuda",
+  "num_workers": 4,
+
+  "use_weighted_bce": true,
+  "pos_weight_clip": 10.0,
+  "pos_weight_eps": 1.0,
+
+  "use_temporal_conv": true,
+  "temporal_hidden_dim": 256,
+  "temporal_kernel_size": 3,
+  "temporal_dropout": 0.2,
+  "temporal_pool": "max",
+
+  "use_soft_augmentations": true,
+  "aug_crop_prob": 0.20,
+  "aug_crop_scale_min": 0.92,
+  "aug_crop_scale_max": 1.00,
+  "aug_crop_ratio_min": 1.72,
+  "aug_crop_ratio_max": 1.83,
+
+  "aug_jitter_prob": 0.25,
+  "aug_brightness": 0.10,
+  "aug_contrast": 0.10,
+  "aug_saturation": 0.08,
+  "aug_hue": 0.02,
+
+  "aug_blur_prob": 0.15,
+  "aug_blur_kernel": 3,
+  "aug_blur_sigma_min": 0.10,
+  "aug_blur_sigma_max": 0.60,
+
+  "aug_hflip_prob": 0.50
+}
