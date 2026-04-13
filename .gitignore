@@ -10,6 +10,7 @@ __pycache__/
 runs
 AI_CITY*
 SoccerNet
+CVMasterActionSpotting
 
 results/
 tmp_scripts/
