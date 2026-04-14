@@ -1,3 +1,6 @@
+## Acces to the Best Model Checkpoint
+[Google Drive link to the model](https://drive.google.com/file/d/1_uqVE4-oJn81JsY-SZ4NKq6KXb6lb9ez/view?usp=sharing)
+
 ### Master in Computer Vision (Barcelona) 2025/26
 # Project 2 (Task 2) @ C6 - Video Analysis
 
