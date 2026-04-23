@@ -1,4 +1,7 @@
 ### Master in Computer Vision (Barcelona) 2025/26
+
+[Google Drive Slides](https://docs.google.com/presentation/d/1TPrL6Se5ynB6Pg-BdE2xZdd4u5jA18Hi5kWX3fwdKgw/edit?slide=id.g3d41f20d7c3_0_54#slide=id.g3d41f20d7c3_0_54)
+
 # Project 2 (Task 2) @ C6 - Video Analysis
 
 This repository provides the starter code for Task 2 of Project 2: Action spotting on the SoccerNet Ball Action Spotting 2025 (SN-BAS-2025) dataset.
